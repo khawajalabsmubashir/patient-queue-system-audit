@@ -1,0 +1,188 @@
+import { AttentionBadges, AttentionButton } from "@/components/appointment-attention";
+import { clinicDayKey } from "@/utils/clinic-date";
+import { Link } from "@tanstack/react-router";
+import { StartConsultation } from "@/components/clinical";
+import { useClinicContext } from "@/providers/clinic-provider";
+import { runAction } from "@/services/queue";
+import { actions, type Entry, useQueue } from "@/lib/queue-store";
+import { Btn, Label, StatusPill } from "@/components/qc";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from "@/components/ui/sheet";
+
+export function PatientDrawer({ entry, onClose }: { entry: Entry | null; onClose: () => void }) {
+  const { selected } = useClinicContext();
+  const { queue, clinic, queueDate } = useQueue();
+  const current = entry
+    ? (queue.find((e) =>
+        entry.id && e.id
+          ? e.id === entry.id
+          : e.token === entry.token && e.date === entry.date && e.clinicId === entry.clinicId,
+      ) ?? entry)
+    : null;
+  const canManage =
+    Boolean(current?.appointmentId) &&
+    selected !== "all" &&
+    (!current?.clinicId || current.clinicId === selected);
+  return (
+    <Sheet
+      open={!!current}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
+      <SheetContent className="w-full overflow-y-auto sm:max-w-md">
+        {current && (
+          <>
+            <SheetHeader>
+              <SheetTitle>Patient details</SheetTitle>
+              <SheetDescription>Queue information for {current.name}.</SheetDescription>
+            </SheetHeader>
+            <div className="mt-8 space-y-7">
+              <div>
+                <Label>Token</Label>
+                <div className="tabular mt-2 text-5xl font-semibold tracking-tight">
+                  {current.token}
+                </div>
+                <p className="mt-2 text-lg font-medium">{current.name}</p>
+              </div>
+              {current.appointmentId && (
+                <div>
+                  <AttentionBadges attention={current.attention} />
+                  <AttentionButton appointmentId={current.appointmentId} />
+                </div>
+              )}
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-5 text-sm">
+                {[
+                  ["Phone", current.phone || "—"],
+                  ["Clinic", current.clinicName ?? clinic.name],
+                  ["Department", current.department ?? clinic.department],
+                  ["Joined", current.joinedAt],
+                  ["Waiting duration", current.token === "—" ? "—" : `${current.waitMin ?? 0} min`],
+                ].map(([label, value]) => (
+                  <div key={label}>
+                    <dt className="text-muted-foreground">{label}</dt>
+                    <dd className="mt-1 break-words font-medium">{value}</dd>
+                  </div>
+                ))}
+                <div>
+                  <dt className="text-muted-foreground">Status</dt>
+                  <dd className="mt-2">
+                    {current.token === "—" ? (
+                      "No visits yet"
+                    ) : (
+                      <StatusPill status={current.status} />
+                    )}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-muted-foreground">Reason</dt>
+                  <dd className="mt-1">{current.reason}</dd>
+                </div>
+              </dl>
+              {current.patientId && (
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    to="/admin/patient-record/$patientId"
+                    params={{ patientId: current.patientId }}
+                  >
+                    <Btn variant="secondary">Patient record</Btn>
+                  </Link>
+                  {canManage && current.status === "serving" && (
+                    <StartConsultation
+                      patientId={current.patientId}
+                      clinicId={current.clinicId ?? selected}
+                      tokenId={current.id}
+                    />
+                  )}
+                </div>
+              )}
+              <section className="border-t border-border pt-6">
+                <h3 className="text-sm font-semibold">Timeline</h3>
+                <ol className="mt-4 space-y-5 border-l border-border pl-5 text-sm">
+                  {[
+                    ["Joined queue", current.joinedAt],
+                    ["Called", current.servedAt ?? "—"],
+                    ["Completed", current.completedAt ?? "—"],
+                    ["Skipped", current.skippedAt ?? "—"],
+                    ["Cancelled", current.cancelledAt ?? "—"],
+                  ].map(([label, time]) => (
+                    <li key={label}>
+                      <p className="font-medium">{label}</p>
+                      <p className="tabular mt-1 text-muted-foreground">{time}</p>
+                    </li>
+                  ))}
+                </ol>
+              </section>
+              <div className="flex flex-wrap gap-2 border-t border-border pt-6">
+                {canManage &&
+                  current.date === queueDate &&
+                  queueDate === clinicDayKey() &&
+                  current.status === "waiting" && (
+                    <Btn
+                      onClick={() => {
+                        void runAction(
+                          () => actions.call(current.token),
+                          `Token ${current.token} is now being served.`,
+                        );
+                      }}
+                    >
+                      Call patient
+                    </Btn>
+                  )}
+                {canManage &&
+                  current.date === queueDate &&
+                  queueDate === clinicDayKey() &&
+                  current.status === "serving" && (
+                    <Btn
+                      onClick={() => {
+                        void runAction(
+                          () => actions.markDone(current.token),
+                          "Patient marked as completed.",
+                        );
+                      }}
+                    >
+                      Mark as done
+                    </Btn>
+                  )}
+                {canManage &&
+                  current.date === queueDate &&
+                  queueDate === clinicDayKey() &&
+                  ["waiting", "serving"].includes(current.status) && (
+                    <Btn
+                      variant="secondary"
+                      onClick={() => {
+                        void runAction(() => actions.skip(current.token), "Token skipped.");
+                      }}
+                    >
+                      Skip
+                    </Btn>
+                  )}
+                {canManage &&
+                  current.date === queueDate &&
+                  queueDate === clinicDayKey() &&
+                  current.status === "skipped" && (
+                    <Btn
+                      variant="secondary"
+                      onClick={() => {
+                        void runAction(
+                          () => actions.requeue(current.token),
+                          "Patient moved back to queue.",
+                        );
+                      }}
+                    >
+                      Move back to queue
+                    </Btn>
+                  )}
+              </div>
+            </div>
+          </>
+        )}
+      </SheetContent>
+    </Sheet>
+  );
+}
