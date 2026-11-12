@@ -365,7 +365,14 @@ function DemographicEditor({
         method: "PUT",
         body: {
           ...Object.fromEntries(
-            ["fullName", "phone", "gender", "address"].map((k) => [k, String(f.get(k) ?? "")]),
+            [
+              "fullName",
+              "phone",
+              "gender",
+              "address",
+              "emergencyContactName",
+              "emergencyContactPhone",
+            ].map((k) => [k, String(f.get(k) ?? "")]),
           ),
           dateOfBirth: String(f.get("dateOfBirth") ?? "") || null,
         },
@@ -403,6 +410,19 @@ function DemographicEditor({
           max={today}
           defaultValue={p.dateOfBirth ?? ""}
         />
+        <Field
+  label="Emergency contact name"
+  name="emergencyContactName"
+  defaultValue={p.emergencyContactName ?? ""}
+  maxLength={120}
+/>
+<Field
+  label="Emergency contact phone"
+  name="emergencyContactPhone"
+  type="tel"
+  defaultValue={p.emergencyContactPhone ?? ""}
+  maxLength={30}
+/>
         <label className="text-sm">
           Gender
           <SelectField
