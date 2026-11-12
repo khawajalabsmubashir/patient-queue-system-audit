@@ -10,6 +10,34 @@ import { PageHeader, Btn, Field } from "@/components/qc";
 import { friendlyError } from "@/services/errors";
 import type { ManagedClinic } from "@/types/local";
 export const Route = createFileRoute("/admin/clinics")({ component: Clinics });
+const DEFAULT_CITIES = [
+  "Abbottabad",
+  "Bahawalpur",
+  "Dera Ghazi Khan",
+  "Faisalabad",
+  "Gilgit",
+  "Gujranwala",
+  "Gujrat",
+  "Hyderabad",
+  "Islamabad",
+  "Jhelum",
+  "Karachi",
+  "Lahore",
+  "Mardan",
+  "Mingora",
+  "Mirpur",
+  "Multan",
+  "Muzaffarabad",
+  "Peshawar",
+  "Quetta",
+  "Rahim Yar Khan",
+  "Rawalpindi",
+  "Sahiwal",
+  "Sargodha",
+  "Sheikhupura",
+  "Sialkot",
+  "Sukkur",
+];
 export function Clinics() {
   const { profile } = useAuth(),
     { select } = useClinicContext();
@@ -71,6 +99,13 @@ export function Clinics() {
       setBusy(false);
     }
   };
+  const cityOptions = [
+    ...new Map(
+      [...DEFAULT_CITIES, ...clinics.map((c) => c.city || "")]
+        .filter(Boolean)
+        .map((name) => [normalizeLocation(name), name])
+    ).values(),
+  ].sort((a, b) => a.localeCompare(b));
   return (
     <>
       <PageHeader
@@ -122,7 +157,7 @@ export function Clinics() {
                 label="City"
                 value={city}
                 allowCreate
-                options={clinics.map((c) => c.city || "")}
+                options={cityOptions}
                 onChange={(v) => {
                   setCity(v);
                   setArea("");
