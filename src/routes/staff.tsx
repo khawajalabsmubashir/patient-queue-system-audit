@@ -49,6 +49,7 @@ function Workspace() {
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [prep, setPrep] = useState<string | null>(null),
+    [prepPatientId, setPrepPatientId] = useState<string | null>(null),
     [patient, setPatient] = useState<string | null>(null),
     [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null),
     [lookup, setLookup] = useState<{ id: string; name: string } | null>(null);
@@ -91,6 +92,7 @@ function Workspace() {
     })) as { id: string } | null;
     if (result) {
       setPrep(result.id);
+      setPrepPatientId(patientId);
       setTab("preparation");
     }
   }
@@ -316,7 +318,11 @@ function Workspace() {
             {tab === "preparation" &&
               nurse &&
               (prep ? (
-                <NursePreparation id={prep} />
+                <NursePreparation
+                  id={prep}
+                  patientId={prepPatientId ?? ""}
+                  clinicId={selected}
+                />
               ) : (
                 <p className="surface p-6 text-sm text-muted-foreground">
                   Open a patient from the serving queue or a scheduled appointment to prepare their
@@ -420,16 +426,31 @@ function DemographicEditor({
     </form>
   );
 }
-function NursePreparation({ id }: { id: string }) {
+
+function NursePreparation({
+  id,
+  patientId,
+  clinicId,
+}: {
+  id: string;
+  patientId: string;
+  clinicId: string;
+}) {
   const remote = useClinicalData<{
     status: string;
     reason_for_visit: string;
     chief_complaint: string;
     vitals: Record<string, number | null> | null;
   }>("/staff/preparations/" + id);
+
+  const patientRemote = useClinicalData<PatientProfile>(
+    "/staff/patients/" + patientId + "?clinicId=" + encodeURIComponent(clinicId),
+  );
+
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [message, setMessage] = useState("");
+
   const fields = [
     ["systolic", "Systolic (mmHg)", "systolic"],
     ["diastolic", "Diastolic (mmHg)", "diastolic"],
@@ -440,16 +461,21 @@ function NursePreparation({ id }: { id: string }) {
     ["weight", "Weight (kg)", "weight"],
     ["height", "Height (cm)", "height"],
   ] as const;
+
   if (!remote.data) return <ClinicalLoading error={remote.error} retry={remote.reload} />;
+
   const d = remote.data;
+
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const f = new FormData(e.currentTarget),
       vitals = Object.fromEntries(
         fields.map(([key]) => [key, f.get(key) === "" ? null : Number(f.get(key))]),
       ) as unknown as Vitals;
+
     setBusy(true);
     setError("");
+
     try {
       await api("/staff/preparations/" + id, {
         method: "PUT",
@@ -467,12 +493,25 @@ function NursePreparation({ id }: { id: string }) {
       setBusy(false);
     }
   }
+
   return (
     <form key={id} onSubmit={(e) => void save(e)} className="surface space-y-5 p-6">
       <h2 className="text-lg font-semibold">Consultation preparation</h2>
       <p className="text-sm text-muted-foreground">
         Optional measurements only. Final clinical decisions remain with the doctor.
       </p>
+
+      <div className="rounded-lg border border-border p-4">
+        <p className="text-sm font-medium text-muted-foreground">Blood Group</p>
+        <p className="mt-1 font-semibold">
+          {patientRemote.data
+            ? patientRemote.data.bloodGroup || "Not provided"
+            : patientRemote.error
+              ? "Unable to load"
+              : "Loading..."}
+        </p>
+      </div>
+
       <fieldset disabled={d.status !== "in_progress" || busy} className="grid gap-4 sm:grid-cols-2">
         <Field
           label="Reason for visit"
@@ -498,6 +537,7 @@ function NursePreparation({ id }: { id: string }) {
         ))}
         <Btn disabled={d.status !== "in_progress" || busy}>Save preparation</Btn>
       </fieldset>
+
       {message && (
         <p role="status" className="text-sm text-success">
           {message}
