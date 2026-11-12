@@ -47,7 +47,6 @@ export function Clinics() {
     [busy, setBusy] = useState(false),
     [fixedCity, setFixedCity] = useState(false),
     [city, setCity] = useState(""),
-    [area, setArea] = useState(""),
     [created, setCreated] = useState<ManagedClinic | null>(null);
   const load = async () => {
     try {
@@ -64,8 +63,8 @@ export function Clinics() {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
     const value = (key: string) => String(data.get(key) ?? "");
-    if (!editing && (!city.trim() || !area.trim())) {
-      setError("Select or enter a city and area before creating this clinic.");
+    if (!city.trim()) {
+      setError("Select or enter a city before creating this clinic.");
       return;
     }
     setBusy(true);
@@ -75,7 +74,6 @@ export function Clinics() {
         method: editing ? "PUT" : "POST",
         body: {
           city,
-          area,
           name: value("name"),
           publicName: editing?.publicDisplayName ?? value("name"),
           address: value("address"),
@@ -118,7 +116,6 @@ export function Clinics() {
                 setFixedCity(false);
                 setEditing(null);
                 setCity("");
-                setArea("");
                 setCreated(null);
               }}
             >
@@ -160,20 +157,9 @@ export function Clinics() {
                 options={cityOptions}
                 onChange={(v) => {
                   setCity(v);
-                  setArea("");
                 }}
               />
             )}
-            <SearchableChoice
-              label="Area"
-              value={area}
-              allowCreate
-              disabled={!city}
-              options={clinics
-                .filter((c) => normalizeLocation(c.city || "") === normalizeLocation(city))
-                .map((c) => c.area || "")}
-              onChange={setArea}
-            />
             <Field
               label="Clinic name"
               name="name"
@@ -261,7 +247,6 @@ export function Clinics() {
                   setEditing(null);
                   setFixedCity(g.city !== "Location not yet specified");
                   setCity(g.city === "Location not yet specified" ? "" : g.city);
-                  setArea("");
                   setCreated(null);
                 }}
               >
@@ -300,7 +285,6 @@ export function Clinics() {
                           setFixedCity(false);
                           setEditing(c);
                           setCity(c.city || "");
-                          setArea(c.area || "");
                           setCreated(null);
                         }}
                       >
