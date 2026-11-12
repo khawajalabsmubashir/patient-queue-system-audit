@@ -68,6 +68,7 @@ function Workspace() {
     setPatient(null);
     setEditingAppointment(null);
     setLookup(null);
+    setPrepPatientId(null);
   }, [selected]);
   async function action(path: string, body: unknown, method = "POST") {
     setBusy(true);
@@ -427,6 +428,7 @@ function DemographicEditor({
   );
 }
 
+
 function NursePreparation({
   id,
   patientId,
@@ -462,21 +464,49 @@ function NursePreparation({
     ["height", "Height (cm)", "height"],
   ] as const;
 
-  if (!remote.data) return <ClinicalLoading error={remote.error} retry={remote.reload} />;
+  if (!remote.data) {
+    return <ClinicalLoading error={remote.error} retry={remote.reload} />;
+  }
+
+  if (!patientRemote.data) {
+    return (
+      <ClinicalLoading
+        error={patientRemote.error}
+        retry={patientRemote.reload}
+      />
+    );
+  }
 
   const d = remote.data;
 
   async function save(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
-    const f = new FormData(e.currentTarget),
-      vitals = Object.fromEntries(
-        fields.map(([key]) => [key, f.get(key) === "" ? null : Number(f.get(key))]),
-      ) as unknown as Vitals;
+
+    const f = new FormData(e.currentTarget);
+    const vitals = Object.fromEntries(
+      fields.map(([key]) => [
+        key,
+        f.get(key) === "" ? null : Number(f.get(key)),
+      ]),
+    ) as unknown as Vitals;
 
     setBusy(true);
     setError("");
+    setMessage("");
 
     try {
+      // Save the patient's blood group.
+      await api(
+        "/staff/patients/" + patientId + "?clinicId=" + encodeURIComponent(clinicId),
+        {
+          method: "PUT",
+          body: {
+            bloodGroup: String(f.get("bloodGroup") ?? ""),
+          },
+        },
+      );
+
+      // Save consultation details and vitals.
       await api("/staff/preparations/" + id, {
         method: "PUT",
         body: {
@@ -485,7 +515,9 @@ function NursePreparation({
           vitals,
         },
       });
+
       setMessage("Consultation preparation saved.");
+      patientRemote.reload();
       window.dispatchEvent(new Event("queuecare:refresh"));
     } catch (e) {
       setError(friendlyError(e));
@@ -497,34 +529,55 @@ function NursePreparation({
   return (
     <form key={id} onSubmit={(e) => void save(e)} className="surface space-y-5 p-6">
       <h2 className="text-lg font-semibold">Consultation preparation</h2>
+
       <p className="text-sm text-muted-foreground">
         Optional measurements only. Final clinical decisions remain with the doctor.
       </p>
 
-      <div className="rounded-lg border border-border p-4">
-        <p className="text-sm font-medium text-muted-foreground">Blood Group</p>
-        <p className="mt-1 font-semibold">
-          {patientRemote.data
-            ? patientRemote.data.bloodGroup || "Not provided"
-            : patientRemote.error
-              ? "Unable to load"
-              : "Loading..."}
-        </p>
-      </div>
-
-      <fieldset disabled={d.status !== "in_progress" || busy} className="grid gap-4 sm:grid-cols-2">
+      <fieldset
+        disabled={d.status !== "in_progress" || busy}
+        className="grid gap-4 sm:grid-cols-2"
+      >
         <Field
           label="Reason for visit"
           name="reason"
           defaultValue={d.reason_for_visit}
           maxLength={2000}
         />
+
         <Field
           label="Chief complaint"
           name="complaint"
           defaultValue={d.chief_complaint}
           maxLength={2000}
         />
+
+        <label className="text-sm">
+          Blood Group
+          <SelectField
+            name="bloodGroup"
+            defaultValue={patientRemote.data.bloodGroup ?? ""}
+            className="mt-2 block w-full rounded-lg border bg-card p-3"
+          >
+            {[
+              "",
+              "A+",
+              "A-",
+              "B+",
+              "B-",
+              "AB+",
+              "AB-",
+              "O+",
+              "O-",
+              "unknown",
+            ].map((v) => (
+              <option key={v} value={v}>
+                {v || "Select blood group"}
+              </option>
+            ))}
+          </SelectField>
+        </label>
+
         {fields.map(([key, label, column]) => (
           <Field
             key={key}
@@ -535,7 +588,10 @@ function NursePreparation({
             defaultValue={d.vitals?.[column] ?? ""}
           />
         ))}
-        <Btn disabled={d.status !== "in_progress" || busy}>Save preparation</Btn>
+
+        <Btn disabled={d.status !== "in_progress" || busy}>
+          {busy ? "Saving..." : "Save preparation"}
+        </Btn>
       </fieldset>
 
       {message && (
@@ -543,6 +599,7 @@ function NursePreparation({
           {message}
         </p>
       )}
+
       {error && (
         <p role="alert" className="text-sm text-destructive">
           {error}
@@ -551,3 +608,4 @@ function NursePreparation({
     </form>
   );
 }
+
