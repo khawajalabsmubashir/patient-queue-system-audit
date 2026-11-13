@@ -8,36 +8,10 @@ import { useAuth } from "@/providers/auth-provider";
 import { useClinicContext } from "@/providers/clinic-provider";
 import { PageHeader, Btn, Field } from "@/components/qc";
 import { friendlyError } from "@/services/errors";
+import { DEFAULT_CITIES } from "@/domain/cities";
 import type { ManagedClinic } from "@/types/local";
 export const Route = createFileRoute("/admin/clinics")({ component: Clinics });
-const DEFAULT_CITIES = [
-  "Abbottabad",
-  "Bahawalpur",
-  "Dera Ghazi Khan",
-  "Faisalabad",
-  "Gilgit",
-  "Gujranwala",
-  "Gujrat",
-  "Hyderabad",
-  "Islamabad",
-  "Jhelum",
-  "Karachi",
-  "Lahore",
-  "Mardan",
-  "Mingora",
-  "Mirpur",
-  "Multan",
-  "Muzaffarabad",
-  "Peshawar",
-  "Quetta",
-  "Rahim Yar Khan",
-  "Rawalpindi",
-  "Sahiwal",
-  "Sargodha",
-  "Sheikhupura",
-  "Sialkot",
-  "Sukkur",
-];
+
 export function Clinics() {
   const { profile } = useAuth(),
     { select } = useClinicContext();

@@ -94,7 +94,7 @@ it("appointment in consultation exposes continue instead of irrelevant mutations
   );
   expect(screen.queryByRole("button", { name: "Check in" })).toBeNull();
 });
-it("patient booking has City Area Clinic and no upload controls; submits only booking fields", async () => {
+it("patient booking has City and Clinic selection; submits only booking fields", async () => {
   f.api.mockImplementation((path: string, options?: { method?: string }) =>
     Promise.resolve(
       path === "/patient/appointments"
@@ -116,7 +116,7 @@ it("patient booking has City Area Clinic and no upload controls; submits only bo
   render(<Appointments />);
   fireEvent.click(screen.getByRole("button", { name: "Book appointment" }));
   expect(screen.getByRole("button", { name: "City" })).toHaveTextContent("Karachi");
-  expect(screen.getByRole("button", { name: "Area" })).toHaveTextContent("Clifton");
+  expect(screen.queryByRole("button", { name: "Area" })).toBeNull();
   expect(screen.getByRole("button", { name: "Clinic" })).toHaveTextContent("Health Point");
   expect(screen.getByLabelText("Add supporting files")).toBeVisible();
   await screen.findByLabelText("Date of birth");
@@ -137,8 +137,8 @@ it("clinic setup requires structured location and omits prefix and queue-average
   render(<Clinics />);
   fireEvent.click(screen.getByRole("button", { name: "Add clinic" }));
   expect(screen.getByRole("button", { name: "City" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Area" })).toBeDisabled();
-  expect(screen.getByLabelText("Clinic name")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Area" })).toBeNull();
+  expect(screen.getByLabelText("Clinic name *")).toBeVisible();
   expect(screen.queryByLabelText("Token prefix")).toBeNull();
   expect(screen.queryByLabelText("Average consultation minutes")).toBeNull();
 });

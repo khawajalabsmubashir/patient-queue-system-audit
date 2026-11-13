@@ -1,8 +1,11 @@
-import { groupClinicLocations, normalizeLocation } from "@/domain/locations";
+import { DEFAULT_CITIES } from "@/domain/cities";
+import { normalizeLocation } from "@/domain/locations";
 import { useState, useEffect } from "react";
 import { SearchableChoice } from "@/components/searchable-choice";
 import { useClinicContext } from "@/providers/clinic-provider";
+
 const legacy = "Location not yet specified";
+
 export function ClinicLocationPicker({
   value,
   onChange,
@@ -13,28 +16,33 @@ export function ClinicLocationPicker({
   const { clinics } = useClinicContext();
   const active = clinics.filter((c) => c.active !== false);
   const selected = active.find((c) => c.id === value);
-  const [city, setCity] = useState(selected?.city || (selected ? legacy : "")),
-    [area, setArea] = useState(selected?.area || (selected ? legacy : ""));
+
+  const [city, setCity] = useState(
+    selected?.city || (selected ? legacy : ""),
+  );
+
   useEffect(() => {
-    const c = active.find((c) => c.id === value);
-    if (c) {
-      setCity(c.city || legacy);
-      setArea(c.area || legacy);
+    const clinic = active.find((c) => c.id === value);
+
+    if (clinic) {
+      setCity(clinic.city || legacy);
     }
   }, [value, clinics]);
-  const cities = groupClinicLocations(active).map((g) => g.city),
-    areas = [
-      ...new Map(
-        active
-          .filter((c) => normalizeLocation(c.city || legacy) === normalizeLocation(city))
-          .map((c) => [normalizeLocation(c.area || legacy), c.area || legacy]),
-      ).values(),
-    ];
+
+  const cities = [
+    ...new Map(
+      [
+        ...DEFAULT_CITIES,
+        ...active.map((c) => c.city || legacy),
+      ].map((name) => [normalizeLocation(name), name]),
+    ).values(),
+  ].sort((a, b) => a.localeCompare(b));
+
   const relevant = active.filter(
     (c) =>
-      (c.city || legacy) === city &&
-      normalizeLocation(c.area || legacy) === normalizeLocation(area),
+      normalizeLocation(c.city || legacy) === normalizeLocation(city),
   );
+
   return (
     <div className="space-y-4">
       <SearchableChoice
@@ -43,33 +51,19 @@ export function ClinicLocationPicker({
         value={city}
         onChange={(v) => {
           setCity(v);
-          setArea("");
           onChange("");
         }}
       />
-      <SearchableChoice
-        label="Area"
-        options={areas}
-        value={area}
-        disabled={!city}
-        onChange={(v) => {
-          setArea(v);
-          const candidates = active.filter(
-            (c) =>
-              (c.city || legacy) === city &&
-              normalizeLocation(c.area || legacy) === normalizeLocation(v),
-          );
-          onChange(candidates.length === 1 ? candidates[0]!.id : "");
-        }}
-      />
+
       <SearchableChoice
         label="Clinic"
         options={relevant.map((c) => c.id)}
         labels={Object.fromEntries(relevant.map((c) => [c.id, c.name]))}
         value={value}
-        disabled={!area}
+        disabled={!city}
         onChange={onChange}
       />
+
       {city === legacy && (
         <p className="text-xs text-muted-foreground">
           These existing clinics remain available while location details are updated.
