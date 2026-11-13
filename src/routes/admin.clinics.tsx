@@ -259,9 +259,7 @@ export function Clinics() {
                         {c.active ? "Active" : "Inactive"}
                       </span>
                     </div>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {c.city && c.area ? `${c.area} · ${c.city}` : "Location details incomplete"}
-                    </p>
+                    
                     <p className="mt-2 text-sm text-muted-foreground">{c.address}</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       {c.department} · {c.phone}
