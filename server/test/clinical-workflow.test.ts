@@ -108,6 +108,27 @@ test(
         password: staffBody.password,
         portal: "staff",
       });
+      const receptionistAppointments = await req(
+        "/staff/appointment-flow?clinicId=northstar",
+        reception.cookie,
+      );
+
+      assert.equal(receptionistAppointments.status, 200);
+      assert.ok(
+        receptionistAppointments.data.some(
+          (appointment: { id: string }) => appointment.id === id,
+        ),
+      );
+
+      // Receptionists cannot view all clinics or use the admin endpoint.
+      assert.equal(
+        (await req("/staff/appointment-flow?clinicId=all", reception.cookie)).status,
+        403,
+      );
+      assert.equal(
+        (await req("/admin/appointment-flow?clinicId=northstar", reception.cookie)).status,
+        403,
+      );
       await req("/admin/staff", admin.cookie, {
         ...staffBody,
         role: "nurse",
@@ -118,6 +139,10 @@ test(
         password: staffBody.password,
         portal: "staff",
       });
+      assert.equal(
+        (await req("/staff/appointment-flow?clinicId=northstar", nurse.cookie)).status,
+        200,
+      );
       assert.equal((await req(`/appointments/${id}/context`, reception.cookie)).status, 403);
       const metadata = {
         title: "Lab report",

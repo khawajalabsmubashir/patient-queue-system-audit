@@ -126,10 +126,12 @@ export function AppointmentRows({
   items,
   onChanged,
   onOpen,
+  readOnly = false,
 }: {
   items: FlowAppointment[];
   onChanged: () => void;
   onOpen?: (a: FlowAppointment) => void;
+  readOnly?: boolean;
 }) {
   const { profile } = useAuth();
   return (
@@ -150,20 +152,24 @@ export function AppointmentRows({
             <span className="block text-xs">{a.scheduledAt.slice(0, 10)}</span>
           </span>
           <div className="min-w-0">
-            <a
-              className="break-words font-medium hover:text-primary"
-              href={
-                "/admin/patient-record/" +
-                a.patientId +
-                "?clinicId=" +
-                a.clinicId +
-                "&appointmentId=" +
-                a.id +
-                (a.tokenId ? "&tokenId=" + a.tokenId : "")
-              }
-            >
-              {a.patientName}
-            </a>
+          {readOnly ? (
+            <span className="break-words font-medium">{a.patientName}</span>
+              ) : (
+                <a
+                  className="break-words font-medium hover:text-primary"
+                  href={
+                    "/admin/patient-record/" +
+                    a.patientId +
+                    "?clinicId=" +
+                    a.clinicId +
+                    "&appointmentId=" +
+                    a.id +
+                    (a.tokenId ? "&tokenId=" + a.tokenId : "")
+                  }
+                >
+                  {a.patientName}
+                </a>
+              )}
             {profile?.role === "admin" && (
               <div className="mt-2">
                 <AttentionBadges attention={a.attention} />
@@ -185,7 +191,7 @@ export function AppointmentRows({
                 ? "Serving"
                 : a.status.replaceAll("_", " ")}
           </span>
-          <AppointmentNextAction a={a} onChanged={onChanged} />
+          {!readOnly && <AppointmentNextAction a={a} onChanged={onChanged} />}
         </div>
       ))}
     </div>

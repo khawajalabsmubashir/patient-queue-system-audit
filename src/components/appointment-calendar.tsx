@@ -38,10 +38,12 @@ export function AppointmentCalendar() {
     typeof window === "undefined"
       ? null
       : new URLSearchParams(window.location.search).get("appointmentId");
-  const remote = useClinicalData<FlowAppointment[]>(
-      "/admin/appointment-flow?clinicId=" + encodeURIComponent(selected),
-    ),
-    admin = profile?.role === "admin";
+      const receptionist = profile?.role === "receptionist",
+      remote = useClinicalData<FlowAppointment[]>(
+        (receptionist ? "/staff/appointment-flow?clinicId=" : "/admin/appointment-flow?clinicId=") +
+          encodeURIComponent(selected),
+      ),
+      admin = profile?.role === "admin";
   useEffect(() => {
     const fn = () => remote.reload();
     window.addEventListener("queuecare:updated", fn);
@@ -95,7 +97,9 @@ export function AppointmentCalendar() {
       <PageHeader
         title="Appointments"
         sub="Today → patient → consultation."
-        right={selected !== "all" && <Btn onClick={() => setEdit("new")}>Add appointment</Btn>}
+        right={!receptionist && selected !== "all" && (
+          <Btn onClick={() => setEdit("new")}>Add appointment</Btn>
+        )}
       />
       <div className="mb-5 flex flex-wrap items-center gap-3">
         {[
@@ -159,7 +163,12 @@ export function AppointmentCalendar() {
         <ClinicalLoading error={remote.error} retry={remote.reload} />
       ) : (
         <div className="surface">
-          <AppointmentRows items={filtered ?? []} onChanged={remote.reload} onOpen={setEdit} />
+          <AppointmentRows
+            items={filtered ?? []}
+            onChanged={remote.reload}
+            {...(!receptionist ? { onOpen: setEdit } : {})}
+            readOnly={receptionist}
+          />
           {!filtered?.length && (
             <div className="p-6 text-sm text-muted-foreground">
               <p>
@@ -177,7 +186,7 @@ export function AppointmentCalendar() {
         </div>
       )}
       <Dialog
-        open={!!edit}
+        open={!receptionist && !!edit}
         onOpenChange={(o) => {
           if (!o) setEdit(null);
         }}

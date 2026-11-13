@@ -4,7 +4,7 @@ import { z } from "zod";
 import { randomUUID } from "node:crypto";
 import { atomic, one, many, type Database, type UserRow } from "../db/database.ts";
 import { requireRole, ApiError } from "../middleware/auth.ts";
-import { audit, idValue } from "../services/operations.ts";
+import { audit, authorizeClinic, idValue } from "../services/operations.ts";
 import { listClinics, appointments } from "../services/clinics.ts";
 import { clinicDayKey } from "../../src/domain/queue.js";
 import type { Notify } from "./queue.ts";
@@ -57,6 +57,25 @@ export async function appointmentFlow(db: Database, clinic: string, date?: strin
 export function workflowRoutes(db: Database, notify: Notify) {
   const r = Router(),
     admin = requireRole(db, "admin");
+    r.get("/staff/appointment-flow", requireRole(db), async (req, res) => {
+      const u = res.locals["user"] as UserRow;
+      const clinic = scope(req.query["clinicId"]);
+  
+      if (clinic === "all" && u.role !== "admin") {
+        throw new ApiError(
+          403,
+          "CLINIC_FORBIDDEN",
+          "A specific assigned clinic is required.",
+        );
+      }
+  
+      await authorizeClinic(db, u, clinic, ["receptionist", "nurse"]);
+  
+      res.json({
+        success: true,
+        data: await appointmentFlow(db, clinic),
+      });
+    });
   r.get("/admin/appointment-flow", admin, async (req, res) =>
     res.json({ success: true, data: await appointmentFlow(db, scope(req.query["clinicId"])) }),
   );
