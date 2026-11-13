@@ -241,17 +241,6 @@ export function Clinics() {
           <section key={normalizeLocation(g.city)} className="p-5 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">{g.city}</h2>
-              <Btn
-                variant="secondary"
-                onClick={() => {
-                  setEditing(null);
-                  setFixedCity(g.city !== "Location not yet specified");
-                  setCity(g.city === "Location not yet specified" ? "" : g.city);
-                  setCreated(null);
-                }}
-              >
-                + Add Area
-              </Btn>
             </div>
             {g.areas.map((a) => (
               <section key={normalizeLocation(a.area)} className="rounded-lg border border-border">
