@@ -244,7 +244,9 @@ export function Clinics() {
             </div>
             {g.areas.map((a) => (
               <section key={normalizeLocation(a.area)} className="rounded-lg border border-border">
-                <h3 className="px-5 pt-4 font-medium">{a.area}</h3>
+                {a.area !== "Area not yet specified" && (
+                  <h3 className="px-5 pt-4 font-medium">{a.area}</h3>
+                )}
                 {a.clinics.map((c) => (
                   <article key={c.id} className="p-5">
                     <div className="flex justify-between gap-3">
