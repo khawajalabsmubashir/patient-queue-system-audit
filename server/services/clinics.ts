@@ -47,8 +47,8 @@ export async function saveClinic(
     const stamp = new Date().toISOString(),
       clinicId = id ?? randomUUID();
     const existing = id ? await clinicValue(db, id) : null;
-    if (!id && (!c.city || !c.area))
-      throw new ApiError(400, "LOCATION_REQUIRED", "City and area are required for a new clinic.");
+    if (!id && !c.city)
+      throw new ApiError(400, "LOCATION_REQUIRED", "City is required for a new clinic.");
     const prefix = existing?.tokenPrefix ?? (await uniquePrefix(db, c.name));
     const legacyAverage = id
       ? (await one<{ average_consultation_minutes: number }>(

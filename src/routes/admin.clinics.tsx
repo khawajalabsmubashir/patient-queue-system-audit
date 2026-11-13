@@ -161,21 +161,21 @@ export function Clinics() {
               />
             )}
             <Field
-              label="Clinic name"
+              label="Clinic name *"
               name="name"
               required
               maxLength={120}
               defaultValue={editing?.name ?? ""}
             />
             <Field
-              label="Address"
+              label="Address *"
               name="address"
               required
               maxLength={250}
               defaultValue={editing?.address ?? ""}
             />
             <Field
-              label="Phone"
+              label="Phone *"
               name="phone"
               required
               maxLength={30}
