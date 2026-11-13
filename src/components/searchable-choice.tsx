@@ -57,7 +57,10 @@ export function SearchableChoice({
               value={query}
               onValueChange={setQuery}
             />
-            <CommandList>
+            <CommandList
+              className="overscroll-contain"
+              onWheel={(event) => event.stopPropagation()}
+            >
               <CommandEmpty>No matches.</CommandEmpty>
               {items.map((v) => (
                 <CommandItem key={v} value={labels[v] || v} onSelect={() => choose(v)}>
