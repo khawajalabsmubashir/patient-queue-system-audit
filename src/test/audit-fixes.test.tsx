@@ -110,7 +110,7 @@ import { Register } from "@/routes/register";
 import { Route as AdminRoute } from "@/routes/admin";
 import { Route as StaffRoute } from "@/routes/staff";
 import { Route as PatientRoute } from "@/routes/patient";
-import { validatePersonName, validatePhoneNumber } from "@/lib/input-validation";
+import { validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
 
 afterEach(() => {
   cleanup();

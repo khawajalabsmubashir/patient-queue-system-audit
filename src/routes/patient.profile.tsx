@@ -7,7 +7,7 @@ import { restoreSession } from "@/services/auth";
 import { PageHeader, Btn, Field } from "@/components/qc";
 import { ClinicalLoading, useClinicalData } from "@/components/clinical";
 import { friendlyError } from "@/services/errors";
-import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/lib/input-validation";
+import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
 import type { PatientProfile } from "@/types/clinical";
 export const Route = createFileRoute("/patient/profile")({ component: Profile });
 function Profile() {

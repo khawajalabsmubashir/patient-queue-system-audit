@@ -5,7 +5,7 @@ import { AuthPage } from "@/components/auth-page";
 import { api } from "@/api/client";
 import { completeGoogleProfile } from "@/services/auth";
 import { friendlyError } from "@/services/errors";
-import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/lib/input-validation";
+import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
 export const Route = createFileRoute("/complete-profile")({
   head: () => ({ meta: [{ title: "Complete your profile — Neuro Spine Care Center" }] }),
   component: CompleteProfile,

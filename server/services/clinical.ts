@@ -5,7 +5,7 @@ import { z } from "zod";
 import { atomic, one, many, type Database } from "../db/database.ts";
 import { ApiError } from "../middleware/auth.ts";
 import { clinicValue } from "./queueService.ts";
-import { validatePersonName, validatePhoneNumber } from "../../src/lib/input-validation.ts";
+import { validatePersonName, validatePhoneNumber } from "../../src/domain/input-validation.ts";
 import type {
   PatientProfile,
   ClinicalVisit,

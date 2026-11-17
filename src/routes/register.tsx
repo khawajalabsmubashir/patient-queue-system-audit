@@ -11,7 +11,7 @@ import {
   MIN_FULL_NAME_LENGTH,
   validatePersonName,
   validatePhoneNumber,
-} from "@/lib/input-validation";
+} from "@/domain/input-validation";
 import { Btn, Field, Logo } from "@/components/qc";
 
 export const Route = createFileRoute("/register")({

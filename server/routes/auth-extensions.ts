@@ -2,7 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { z } from "zod";
-import { validatePersonName, validatePhoneNumber } from "../../src/lib/input-validation.ts";
+import { validatePersonName, validatePhoneNumber } from "../../src/domain/input-validation.ts";
 import { atomic, one, type Database, type UserRow } from "../db/database.ts";
 import { ApiError, publicUser, startSession, authCookieOptions } from "../middleware/auth.ts";
 import type { AuthOptions, GoogleIdentity } from "../services/identity.ts";

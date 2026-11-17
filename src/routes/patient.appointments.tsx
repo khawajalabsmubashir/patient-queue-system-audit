@@ -16,7 +16,7 @@ import { useClinicContext } from "@/providers/clinic-provider";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { api } from "@/api/client";
 import { friendlyError } from "@/services/errors";
-import { validatePersonName } from "@/lib/input-validation";
+import { validatePersonName } from "@/domain/input-validation";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
 import type { Appointment } from "@/types/local";
 export const Route = createFileRoute("/patient/appointments")({ component: Appointments });

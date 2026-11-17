@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Field } from "@/components/qc";
 import { SelectField } from "@/components/form-controls";
 import { ageOnDate } from "@/domain/patient-demographics";
-import { MAX_FULL_NAME_LENGTH, MIN_FULL_NAME_LENGTH } from "@/lib/input-validation";
+import { MAX_FULL_NAME_LENGTH, MIN_FULL_NAME_LENGTH } from "@/domain/input-validation";
 import type { PatientProfile } from "@/types/clinical";
 export function PatientDemographics({
   patient,

@@ -3,7 +3,7 @@ import type { Database } from "../db/database.ts";
 import { randomUUID } from "node:crypto";
 import { compare, hash, hashSync } from "bcryptjs";
 import { z } from "zod";
-import { validatePersonName, validatePhoneNumber } from "../../src/lib/input-validation.ts";
+import { validatePersonName, validatePhoneNumber } from "../../src/domain/input-validation.ts";
 import { one, type UserRow } from "../db/database.ts";
 import {
   ApiError,
