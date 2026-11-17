@@ -8,7 +8,7 @@ import type { PatientProfile } from "@/types/clinical";
 import { TokenActions } from "@/components/appointment-tokens";
 import { ClinicLocationPicker } from "@/components/clinic-location-picker";
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Btn, Field } from "@/components/qc";
+import { PageHeader, Btn } from "@/components/qc";
 import { useState } from "react";
 import { appointmentTimeLabel } from "@/lib/appointment-time";
 import { AppointmentSlotPicker } from "@/components/appointment-slot-picker";
@@ -16,6 +16,7 @@ import { useClinicContext } from "@/providers/clinic-provider";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { api } from "@/api/client";
 import { friendlyError } from "@/services/errors";
+import { validatePersonName } from "@/lib/input-validation";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
 import type { Appointment } from "@/types/local";
 export const Route = createFileRoute("/patient/appointments")({ component: Appointments });
@@ -35,8 +36,8 @@ export function Appointments() {
   const [clinicId, setClinicId] = useState(selected === "all" ? "" : selected);
   const [notes, setNotes] = useState(""),
     [review, setReview] = useState<{
+      fullName: string;
       scheduledAt: string;
-      reason: string;
       dateOfBirth: string;
       gender: string;
     } | null>(null);
@@ -73,7 +74,7 @@ export function Appointments() {
             {confirmed.token.tokenCode}
           </p>
           <a
-            className="mt-4 inline-block text-primary"
+            className="mt-4 inline-block text-primary hover:underline"
             href={"/patient/appointment/" + confirmed.id}
           >
             View appointment →
@@ -114,7 +115,7 @@ export function Appointments() {
                 {a.scheduledAt.slice(0, 10)} {appointmentTimeLabel(a.scheduledAt.slice(11))} ·{" "}
                 {a.status}
               </p>
-              <p className="mt-1 text-sm">{a.reason}</p>
+              {a.reason && <p className="mt-1 text-sm">{a.reason}</p>}
               {a.token && (
                 <p className="mt-2 text-sm font-semibold text-primary">Token {a.token.tokenCode}</p>
               )}
@@ -146,9 +147,18 @@ export function Appointments() {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
               if (!review) {
+                const nameCheck = validatePersonName(
+                  String(f.get("fullName") ?? ""),
+                  "Patient name",
+                );
+                if (!nameCheck.ok) {
+                  setError(nameCheck.error);
+                  return;
+                }
+                setError("");
                 setReview({
+                  fullName: nameCheck.value,
                   scheduledAt: String(f.get("scheduledAt") ?? ""),
-                  reason: String(f.get("reason") ?? ""),
                   dateOfBirth: String(f.get("dateOfBirth") ?? ""),
                   gender: String(f.get("gender") ?? ""),
                 });
@@ -162,7 +172,7 @@ export function Appointments() {
                 await api("/patient/profile", {
                   method: "PUT",
                   body: {
-                    fullName: patient.data.fullName,
+                    fullName: review.fullName,
                     phone: patient.data.phone,
                     address: patient.data.address,
                     dateOfBirth: review.dateOfBirth,
@@ -176,7 +186,7 @@ export function Appointments() {
                     body: {
                       clinicId,
                       scheduledAt: review.scheduledAt,
-                      reason: review.reason,
+                      reason: "",
                       patientNotes: notes,
                     },
                   },
@@ -196,10 +206,8 @@ export function Appointments() {
               })()
                 .catch((e) => {
                   setError(friendlyError(e));
-                  {
-                    setReview(null);
-                    setRefresh((n) => n + 1);
-                  }
+                  setReview(null);
+                  setRefresh((n) => n + 1);
                 })
                 .finally(() => setBusy(false));
             }}
@@ -218,7 +226,6 @@ export function Appointments() {
                 }}
               />
               {clinicId && <AppointmentSlotPicker clinicId={clinicId} refresh={refresh} />}
-              <Field label="Reason for appointment (optional)" name="reason" maxLength={300} />
               <label className="mt-4 block text-sm">
                 Patient notes (optional)
                 <textarea
@@ -235,6 +242,7 @@ export function Appointments() {
             {review && (
               <section className="space-y-3 rounded-lg border p-4">
                 <h2>Review your appointment</h2>
+                <p className="font-medium">Patient: {review.fullName}</p>
                 <p>
                   {clinics.find((c) => c.id === clinicId)?.name} ·{" "}
                   {review.scheduledAt.replace("T", " ")}
@@ -242,18 +250,15 @@ export function Appointments() {
                 <p>
                   Gender: {review.gender.replaceAll("_", " ")} · Date of birth: {review.dateOfBirth}
                 </p>
-                <p className="break-words">{review.reason || "No reason provided"}</p>
-                <p className="whitespace-pre-wrap break-words">{notes}</p>
-                {
-                  <Btn
-                    type="button"
-                    variant="ghost"
-                    disabled={busy}
-                    onClick={() => setReview(null)}
-                  >
-                    Back to edit
-                  </Btn>
-                }
+                {notes && <p className="whitespace-pre-wrap break-words">{notes}</p>}
+                <Btn
+                  type="button"
+                  variant="ghost"
+                  disabled={busy}
+                  onClick={() => setReview(null)}
+                >
+                  Back to edit
+                </Btn>
               </section>
             )}
             {error && (

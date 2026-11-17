@@ -7,6 +7,7 @@ import { restoreSession } from "@/services/auth";
 import { PageHeader, Btn, Field } from "@/components/qc";
 import { ClinicalLoading, useClinicalData } from "@/components/clinical";
 import { friendlyError } from "@/services/errors";
+import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/lib/input-validation";
 import type { PatientProfile } from "@/types/clinical";
 export const Route = createFileRoute("/patient/profile")({ component: Profile });
 function Profile() {
@@ -21,6 +22,10 @@ function Profile() {
     e.preventDefault();
     const f = new FormData(e.currentTarget),
       value = (k: string) => String(f.get(k) ?? "");
+    const nameCheck = validatePersonName(value("fullName"), "Full name");
+    if (!nameCheck.ok) { setError(nameCheck.error); return; }
+    const phoneCheck = validatePhoneNumber(value("phone"));
+    if (!phoneCheck.ok) { setError(phoneCheck.error); return; }
     setBusy(true);
     setError("");
     setMessage("");
@@ -28,8 +33,8 @@ function Profile() {
       await api("/patient/profile", {
         method: "PUT",
         body: {
-          fullName: value("fullName"),
-          phone: value("phone"),
+          fullName: nameCheck.value,
+          phone: phoneCheck.value,
           dateOfBirth: value("dateOfBirth") || null,
           gender: value("gender"),
           address: value("address"),
@@ -53,7 +58,7 @@ function Profile() {
             name="fullName"
             required
             minLength={2}
-            maxLength={120}
+            maxLength={MAX_FULL_NAME_LENGTH}
             defaultValue={p.fullName}
           />
           <Field label="Email (sign-in identity)" value={p.email} readOnly />
@@ -62,7 +67,7 @@ function Profile() {
             name="phone"
             required
             minLength={7}
-            maxLength={30}
+            maxLength={MAX_PHONE_LENGTH}
             defaultValue={p.phone}
           />
           <Field

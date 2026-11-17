@@ -1,4 +1,4 @@
-import { AttentionBadges, AttentionButton } from "@/components/appointment-attention";
+import { AttentionBadges } from "@/components/appointment-attention";
 import { useAuth } from "@/providers/auth-provider";
 import { api } from "@/api/client";
 import { useState } from "react";
@@ -170,10 +170,9 @@ export function AppointmentRows({
                   {a.patientName}
                 </a>
               )}
-            {profile?.role === "admin" && (
+            {profile?.role === "admin" && a.attention && (
               <div className="mt-2">
                 <AttentionBadges attention={a.attention} />
-                <AttentionButton appointmentId={a.id} onChanged={onChanged} />
               </div>
             )}
             {onOpen && (

@@ -28,7 +28,7 @@ export function AttachmentFields({
         Supporting Documents <span className="text-muted-foreground">(optional)</span>
       </h2>
       <p className="text-sm text-muted-foreground">
-        Up to 10 files. PDF, JPEG or PNG, up to 10 MB each. Files remain private.
+        Up to 10 files. PDF, JPEG or PNG, up to 5 MB each. Files remain private.
       </p>
       <label className="block text-sm">
         Choose Files
@@ -50,12 +50,12 @@ export function AttachmentFields({
               incoming.some(
                 (f) =>
                   f.size === 0 ||
-                  f.size > 10485760 ||
+                  f.size > 5242880 ||
                   !["application/pdf", "image/jpeg", "image/png"].includes(f.type) ||
                   !/\.(pdf|jpe?g|png)$/i.test(f.name),
               )
             ) {
-              setError("Choose PDF, JPEG or PNG files between 1 byte and 10 MB.");
+              setError("Choose PDF, JPEG or PNG files between 1 byte and 5 MB.");
               return;
             }
             setError("");

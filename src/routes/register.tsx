@@ -5,32 +5,50 @@ import { ArrowRight, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { register } from "@/services/auth";
 import { friendlyError } from "@/services/errors";
+import {
+  MAX_FULL_NAME_LENGTH,
+  MAX_PHONE_LENGTH,
+  MIN_FULL_NAME_LENGTH,
+  validatePersonName,
+  validatePhoneNumber,
+} from "@/lib/input-validation";
 import { Btn, Field, Logo } from "@/components/qc";
 
 export const Route = createFileRoute("/register")({
   head: () => ({ meta: [{ title: "Create an account — Neuro Spine Care Center" }] }),
   component: Register,
 });
-function Register() {
+export function Register() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   async function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
-    if (data.get("password") !== data.get("confirm")) {
+    const rawName = String(data.get("name") ?? "");
+    const rawEmail = String(data.get("email") ?? "");
+    const rawPhone = String(data.get("phone") ?? "");
+    const password = String(data.get("password") ?? "");
+    const confirm = String(data.get("confirm") ?? "");
+
+    const nameCheck = validatePersonName(rawName, "Full name");
+    if (!nameCheck.ok) {
+      setError(nameCheck.error);
+      return;
+    }
+    const phoneCheck = validatePhoneNumber(rawPhone);
+    if (!phoneCheck.ok) {
+      setError(phoneCheck.error);
+      return;
+    }
+    if (password !== confirm) {
       setError("Passwords do not match.");
       return;
     }
     setError("");
     setLoading(true);
     try {
-      await register(
-        String(data.get("name")),
-        String(data.get("email")),
-        String(data.get("phone")),
-        String(data.get("password")),
-      );
+      await register(nameCheck.value, rawEmail, phoneCheck.value, password);
       toast.success("Account created. Welcome to Neuro Spine Care Center.");
       await navigate({ to: "/patient/dashboard" });
     } catch (err) {
@@ -74,10 +92,34 @@ function Register() {
           <p className="mt-1.5 text-sm text-muted-foreground">
             Your next visit, with less waiting.
           </p>
-          <form onSubmit={submit} className="mt-7 space-y-4">
-            <Field label="Full name" name="name" autoComplete="name" required />
+          <form onSubmit={submit} noValidate className="mt-7 space-y-4">
+            <div>
+              <Field
+                label="Full name"
+                name="name"
+                autoComplete="name"
+                minLength={MIN_FULL_NAME_LENGTH}
+                maxLength={MAX_FULL_NAME_LENGTH}
+                required
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Letters, spaces, hyphens, apostrophes or periods (max {MAX_FULL_NAME_LENGTH} characters).
+              </p>
+            </div>
             <Field label="Email" name="email" type="email" autoComplete="email" required />
-            <Field label="Phone" name="phone" type="tel" autoComplete="tel" required />
+            <div>
+              <Field
+                label="Phone"
+                name="phone"
+                type="tel"
+                autoComplete="tel"
+                maxLength={MAX_PHONE_LENGTH}
+                required
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                7–15 digits (max {MAX_PHONE_LENGTH} characters).
+              </p>
+            </div>
             <Field
               label="Password"
               name="password"

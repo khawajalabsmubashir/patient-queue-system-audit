@@ -38,6 +38,9 @@ export async function api<T>(
         response.status,
       );
     }
+    if (typeof window !== "undefined" && (options.method ?? "GET").toUpperCase() !== "GET") {
+      window.dispatchEvent(new Event("queuecare:invalidate-cache"));
+    }
     return result.data;
   } catch (error) {
     if (error instanceof ApiError) throw error;

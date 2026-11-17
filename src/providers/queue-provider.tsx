@@ -256,7 +256,14 @@ export function QueueProvider({
       refreshNow();
       window.dispatchEvent(new Event("queuecare:updated"));
     });
-    socket.on("connect", refreshNow);
+    let connectedOnce = false;
+    socket.on("connect", () => {
+      if (!connectedOnce) {
+        connectedOnce = true;
+        return;
+      }
+      refreshNow();
+    });
     window.addEventListener("queuecare:refresh", refreshNow);
     const timer = setInterval(refreshNow, 30000);
     return () => {

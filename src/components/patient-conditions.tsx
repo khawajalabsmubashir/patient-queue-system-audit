@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { api } from "@/api/client";
-import { Btn } from "@/components/qc";
+import { Btn, Field } from "@/components/qc";
 import { SearchableChoice } from "@/components/searchable-choice";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
 import { friendlyError } from "@/services/errors";
@@ -9,17 +9,30 @@ export function PatientConditions({ patientId }: { patientId: string }) {
   const remote = useClinicalData<Condition[]>("/admin/patients/" + patientId + "/conditions"),
     library = useClinicalData<Condition[]>("/admin/conditions");
   const [name, setName] = useState(""),
+    [otherName, setOtherName] = useState(""),
     [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  const isOther = name.trim().toLowerCase() === "other";
+  const effectiveName = isOther ? otherName.trim() : name.trim();
+  const baseOptions = (library.data?.map((c) => c.name) ?? []).filter(
+    (c) => c.trim().toLowerCase() !== "other",
+  );
+  const options = [...baseOptions, "Other"];
+
   async function change(condition?: Condition) {
+    if (!condition && !effectiveName) return;
     setBusy(true);
     setError("");
     try {
       await api(
         "/admin/patients/" + patientId + "/conditions" + (condition ? "/" + condition.id : ""),
-        { method: condition ? "DELETE" : "POST", ...(condition ? {} : { body: { name } }) },
+        {
+          method: condition ? "DELETE" : "POST",
+          ...(condition ? {} : { body: { name: effectiveName } }),
+        },
       );
       setName("");
+      setOtherName("");
       remote.reload();
       library.reload();
     } catch (e) {
@@ -61,7 +74,7 @@ export function PatientConditions({ patientId }: { patientId: string }) {
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (name.trim()) void change();
+          if (effectiveName) void change();
         }}
         className="flex flex-wrap items-end gap-3"
       >
@@ -69,13 +82,32 @@ export function PatientConditions({ patientId }: { patientId: string }) {
           <SearchableChoice
             label="Condition"
             value={name}
-            onChange={setName}
-            options={library.data?.map((c) => c.name) ?? []}
+            onChange={(val) => {
+              setName(val);
+              if (val.trim().toLowerCase() !== "other") {
+                setOtherName("");
+              }
+            }}
+            options={options}
             allowCreate
             disabled={busy}
           />
         </div>
-        <Btn variant="secondary" disabled={busy || !name.trim()}>
+        {isOther && (
+          <div className="w-full max-w-sm">
+            <Field
+              label="Other condition"
+              name="otherCondition"
+              placeholder="Enter custom condition"
+              value={otherName}
+              onChange={(e) => setOtherName(e.target.value)}
+              maxLength={120}
+              required
+              disabled={busy}
+            />
+          </div>
+        )}
+        <Btn variant="secondary" disabled={busy || !effectiveName}>
           Add condition
         </Btn>
       </form>

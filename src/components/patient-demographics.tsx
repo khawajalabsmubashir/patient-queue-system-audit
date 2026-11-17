@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Field } from "@/components/qc";
 import { SelectField } from "@/components/form-controls";
 import { ageOnDate } from "@/domain/patient-demographics";
+import { MAX_FULL_NAME_LENGTH, MIN_FULL_NAME_LENGTH } from "@/lib/input-validation";
 import type { PatientProfile } from "@/types/clinical";
 export function PatientDemographics({
   patient,
@@ -12,10 +13,20 @@ export function PatientDemographics({
   required?: boolean;
 }) {
   const today = usePatientToday();
+  const [fullName, setFullName] = useState(patient.fullName ?? "");
   const [dob, setDob] = useState(patient.dateOfBirth ?? "");
   return (
     <section className="grid gap-4 sm:grid-cols-2">
-      <Field label="Patient name" value={patient.fullName} readOnly />
+      <Field
+        label="Patient name"
+        name="fullName"
+        required={required}
+        minLength={MIN_FULL_NAME_LENGTH}
+        maxLength={MAX_FULL_NAME_LENGTH}
+        autoComplete="name"
+        value={fullName}
+        onChange={(e) => setFullName(e.target.value)}
+      />
       <label className="block text-sm font-medium">
         Gender
         <SelectField

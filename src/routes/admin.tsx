@@ -6,11 +6,22 @@ import { logout } from "@/services/auth";
 import { runAction } from "@/services/queue";
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
-import { History, LayoutGrid, ListOrdered, Monitor, Settings, Users, Menu } from "lucide-react";
+import { History, LayoutGrid, ListOrdered, Monitor, Settings, Users, Menu, LogOut } from "lucide-react";
 import { Logo, LiveDot } from "@/components/qc";
 import { useQueue } from "@/lib/queue-store";
 import { cn } from "@/lib/utils";
 import { Notifications, QueueBoundary } from "@/components/queue-feedback";
+import { prefetchClinicalData } from "@/components/clinical";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Sheet,
   SheetContent,
@@ -32,6 +43,38 @@ const nav = [
   { to: "/admin/billing", label: "Billing", icon: ListOrdered },
   { to: "/admin/reports", label: "Reports", icon: Settings },
 ] as const;
+
+function prefetchAdminRoute(to: string, selected: string) {
+  const clinic = encodeURIComponent(selected);
+  switch (to) {
+    case "/admin":
+      prefetchClinicalData(`/admin/today?clinicId=${clinic}`);
+      break;
+    case "/admin/appointments":
+      prefetchClinicalData(`/admin/appointment-flow?clinicId=${clinic}`);
+      break;
+    case "/admin/patients":
+      prefetchClinicalData(`/admin/conditions?clinicId=${clinic}`);
+      prefetchClinicalData(`/admin/patients/search?q=&clinicId=${clinic}&conditionId=&clinical=`);
+      break;
+    case "/admin/medicine-library":
+      if (selected !== "all") prefetchClinicalData(`/admin/medicine-library?clinicId=${clinic}`);
+      break;
+    case "/admin/clinics":
+      prefetchClinicalData("/admin/clinics");
+      break;
+    case "/admin/doctor-schedule":
+      if (selected !== "all") prefetchClinicalData(`/admin/doctor-availability?clinicId=${clinic}`);
+      break;
+    case "/admin/staff":
+      prefetchClinicalData("/admin/staff");
+      break;
+    case "/admin/billing":
+      prefetchClinicalData(`/billing/invoices?clinicId=${clinic}`);
+      break;
+  }
+}
+
 function AdminNavigation({ onNavigate }: { onNavigate?: () => void }) {
   const { selected } = useClinicContext();
   return (
@@ -41,6 +84,8 @@ function AdminNavigation({ onNavigate }: { onNavigate?: () => void }) {
           key={n.to}
           to={n.to}
           onClick={onNavigate}
+          onMouseEnter={() => prefetchAdminRoute(n.to, selected)}
+          onFocus={() => prefetchAdminRoute(n.to, selected)}
           activeOptions={{ exact: "exact" in n }}
           className="flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground/75 transition hover:bg-sidebar-accent"
           activeProps={{
@@ -84,6 +129,7 @@ function AdminLayoutContent() {
   const { open, clinic, queueDate } = useQueue();
   const { pathname } = useLocation();
   const [menu, setMenu] = useState(false);
+  const [confirmLogout, setConfirmLogout] = useState(false);
   const date = new Date(`${queueDate}T12:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
     month: "short",
@@ -95,9 +141,10 @@ function AdminLayoutContent() {
         <Logo className="px-2" />
         <AdminNavigation />
         <button
+          type="button"
           aria-label="Sign out"
-          onClick={() => void runAction(logout, "Signed out.")}
-          className="mt-auto flex items-center gap-3 rounded-lg p-2 hover:bg-sidebar-accent"
+          onClick={() => setConfirmLogout(true)}
+          className="mt-auto flex items-center gap-3 rounded-lg p-2 text-left hover:bg-sidebar-accent"
         >
           <div className="grid size-8 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-accent-foreground">
             {initials}
@@ -118,10 +165,11 @@ function AdminLayoutContent() {
           </SheetHeader>
           <AdminNavigation onNavigate={() => setMenu(false)} />
           <button
-            className="mt-8 block rounded-lg px-3 py-3 text-sm"
+            type="button"
+            className="mt-8 block rounded-lg px-3 py-3 text-sm hover:bg-sidebar-accent"
             onClick={() => {
               setMenu(false);
-              void runAction(logout, "Signed out.");
+              setConfirmLogout(true);
             }}
           >
             {profile?.fullName} · Sign out
@@ -157,11 +205,13 @@ function AdminLayoutContent() {
           <GlobalSearch />
           <Notifications role="admin" />
           <button
+            type="button"
             aria-label="Logout"
-            className="shrink-0 rounded-lg px-2 py-2 text-sm hover:bg-muted"
-            onClick={() => void runAction(logout, "Signed out.")}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium hover:bg-muted"
+            onClick={() => setConfirmLogout(true)}
           >
-            Logout
+            <LogOut className="size-4" />
+            <span>Logout</span>
           </button>
         </header>
         <main
@@ -182,6 +232,27 @@ function AdminLayoutContent() {
           )}
         </main>
       </div>
+      <AlertDialog open={confirmLogout} onOpenChange={setConfirmLogout}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Any unsaved changes in an open form will be lost. You will need to sign in again to access the admin dashboard.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmLogout(false);
+                void runAction(logout, "Signed out.");
+              }}
+            >
+              Yes, Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

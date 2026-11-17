@@ -2,9 +2,22 @@ import { AppointmentTokens } from "@/components/appointment-tokens";
 import { PatientSummary } from "@/components/final-operations";
 import { useAuth } from "@/providers/auth-provider";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { ArrowRight, Clock, MapPin, Phone, Ticket, Users, BellRing } from "lucide-react";
+import {
+  ArrowRight,
+  BellRing,
+  CalendarPlus,
+  ClipboardList,
+  Clock,
+  MapPin,
+  Phone,
+  Pill,
+  Receipt,
+  Ticket,
+  Users,
+} from "lucide-react";
 import { formatTime, useQueue } from "@/lib/queue-store";
 import { PatientStatus } from "@/components/queue-feedback";
+import { prefetchClinicalData } from "@/components/clinical";
 import { Btn, Label, LiveDot, StatusPill } from "@/components/qc";
 
 export const Route = createFileRoute("/patient/dashboard")({
@@ -26,7 +39,7 @@ export const Route = createFileRoute("/patient/dashboard")({
 });
 
 export function QueueHero() {
-  const { mine, serving, ahead, eta, waiting, avgMin, clinic, open } = useQueue();
+  const { mine, serving, ahead, eta, waiting, avgMin, clinic } = useQueue();
   if (!mine) return null;
   if (!["waiting", "serving"].includes(mine.status))
     return (
@@ -121,18 +134,43 @@ export function QueueHero() {
 }
 
 function Dashboard() {
-  const { mine, serving, open, openedToday, clinic } = useQueue();
+  const { mine, open, clinic } = useQueue();
   const { profile } = useAuth();
   return (
     <>
-      <div className="mb-8">
-        <h1 className="text-[28px] font-semibold tracking-tight md:text-[34px]">
-          Good morning, {profile?.fullName.split(" ")[0]}
-        </h1>
-        <p className="mt-1.5 text-[15px] text-muted-foreground">
-          Here's your queue status for today.
-        </p>
-      </div>
+      <section className="surface mb-8 flex flex-col justify-between gap-6 bg-gradient-to-br from-card via-card to-primary-soft/45 p-6 md:flex-row md:items-center md:p-8">
+        <div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
+            <span className={`size-2 rounded-full ${open ? "bg-success" : "bg-muted-foreground"}`} />
+            {clinic.name || "Selected clinic"} · {open ? "Queue open" : "Queue closed"}
+          </div>
+          <h1 className="mt-3 text-[28px] font-semibold tracking-tight md:text-[34px]">
+            Good morning, {profile?.fullName.split(" ")[0]}
+          </h1>
+          <p className="mt-1.5 text-[15px] text-muted-foreground">
+            Here's your queue status, upcoming appointments, and care summary for today.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2.5">
+          <Link
+            to="/patient/appointments"
+            search={{ book: "1" } as never}
+            onMouseEnter={() => prefetchClinicalData("/patient/appointments")}
+          >
+            <Btn>
+              <CalendarPlus className="size-4" />
+              Book appointment
+            </Btn>
+          </Link>
+          <Link
+            to="/patient/live-queue"
+          >
+            <Btn variant="secondary">
+              Live queue
+            </Btn>
+          </Link>
+        </div>
+      </section>
 
       <AppointmentTokens />
       {mine && (
@@ -142,10 +180,59 @@ function Dashboard() {
         </>
       )}
 
-      <div className="mt-10 grid gap-10 md:grid-cols-3">
-        <div className="md:col-span-2">
+      <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          {
+            to: "/patient/appointments",
+            title: "Appointments",
+            desc: "Schedule or view tokens",
+            icon: Ticket,
+            prefetch: "/patient/appointments",
+          },
+          {
+            to: "/patient/visits",
+            title: "My visits",
+            desc: "Consultation summaries",
+            icon: ClipboardList,
+            prefetch: "/patient/visits",
+          },
+          {
+            to: "/patient/prescriptions",
+            title: "Prescriptions",
+            desc: "Medicines & A4 print",
+            icon: Pill,
+            prefetch: "/patient/prescriptions",
+          },
+          {
+            to: "/patient/billing",
+            title: "Billing",
+            desc: "Invoices & payments",
+            icon: Receipt,
+            prefetch: "/billing/invoices?clinicId=all",
+          },
+        ].map((item) => (
+          <Link
+            key={item.to}
+            to={item.to}
+            onMouseEnter={() => prefetchClinicalData(item.prefetch)}
+            onFocus={() => prefetchClinicalData(item.prefetch)}
+            className="surface group flex items-center gap-3.5 p-4 transition hover:border-primary/40 hover:shadow-lift"
+          >
+            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
+              <item.icon className="size-5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold">{item.title}</p>
+              <p className="truncate text-xs text-muted-foreground">{item.desc}</p>
+            </div>
+          </Link>
+        ))}
+      </section>
+
+      <div className="mt-8 grid gap-6 md:grid-cols-3">
+        <div className="surface p-6 md:col-span-2">
           <h2 className="text-lg font-semibold tracking-tight">Before you arrive</h2>
-          <ul className="mt-4 divide-y divide-border border-y border-border">
+          <ul className="mt-4 divide-y divide-border">
             {(
               [
                 [
@@ -165,8 +252,10 @@ function Dashboard() {
                 ],
               ] as const
             ).map(([Icon, t, d]) => (
-              <li key={t} className="flex gap-4 py-4">
-                <Icon className="mt-0.5 size-[18px] shrink-0 text-primary" />
+              <li key={t} className="flex gap-4 py-4 first:pt-1 last:pb-1">
+                <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
+                  <Icon className="size-[18px]" />
+                </div>
                 <div>
                   <div className="text-sm font-medium">{t}</div>
                   <div className="text-sm text-muted-foreground">{d}</div>
@@ -175,7 +264,7 @@ function Dashboard() {
             ))}
           </ul>
           {mine && (
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-6 flex flex-wrap gap-3 border-t border-border pt-5">
               <Link to="/patient/live-queue">
                 <Btn>
                   View live queue <ArrowRight className="size-4" />
@@ -190,21 +279,29 @@ function Dashboard() {
             </div>
           )}
         </div>
-        <aside>
-          <h2 className="text-lg font-semibold tracking-tight">Clinic</h2>
-          <div className="mt-4 space-y-3 text-sm">
-            <div className="font-medium">{clinic.name}</div>
-            <div className="flex gap-2.5 text-muted-foreground">
-              <MapPin className="size-4 shrink-0" /> {clinic.address}
+        <aside className="surface flex flex-col justify-between p-6">
+          <div>
+            <h2 className="text-lg font-semibold tracking-tight">Clinic</h2>
+            <div className="mt-4 space-y-3.5 text-sm">
+              <div className="font-semibold text-foreground">{clinic.name}</div>
+              <div className="flex gap-2.5 text-muted-foreground">
+                <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
+                <span>{clinic.address || "Address on file"}</span>
+              </div>
+              <div className="flex gap-2.5 text-muted-foreground">
+                <Clock className="mt-0.5 size-4 shrink-0 text-primary" />
+                <span>
+                  Today · {formatTime(clinic.opening)} – {formatTime(clinic.closing)}
+                </span>
+              </div>
+              <div className="flex gap-2.5 text-muted-foreground">
+                <Phone className="mt-0.5 size-4 shrink-0 text-primary" />
+                <span>{clinic.phone || "Phone on file"}</span>
+              </div>
             </div>
-            <div className="flex gap-2.5 text-muted-foreground">
-              <Clock className="size-4 shrink-0" /> Today · {formatTime(clinic.opening)} –{" "}
-              {formatTime(clinic.closing)}
-            </div>
-            <div className="flex gap-2.5 text-muted-foreground">
-              <Phone className="size-4 shrink-0" /> {clinic.phone}
-            </div>
-            <div className="inline-flex items-center gap-2 pt-1 text-xs font-medium text-success">
+          </div>
+          <div className="mt-5 border-t border-border pt-4">
+            <div className="inline-flex items-center gap-2 rounded-full bg-success-soft px-3 py-1 text-xs font-medium text-success">
               <span className="size-1.5 rounded-full bg-current" />
               {open ? "Queue open" : "Queue closed"}
             </div>

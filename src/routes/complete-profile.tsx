@@ -5,6 +5,7 @@ import { AuthPage } from "@/components/auth-page";
 import { api } from "@/api/client";
 import { completeGoogleProfile } from "@/services/auth";
 import { friendlyError } from "@/services/errors";
+import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/lib/input-validation";
 export const Route = createFileRoute("/complete-profile")({
   head: () => ({ meta: [{ title: "Complete your profile — Neuro Spine Care Center" }] }),
   component: CompleteProfile,
@@ -38,10 +39,14 @@ export function CompleteProfile() {
           onSubmit={async (event) => {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
+            const nameCheck = validatePersonName(String(data.get("name") ?? ""), "Full name");
+            if (!nameCheck.ok) { setError(nameCheck.error); return; }
+            const phoneCheck = validatePhoneNumber(String(data.get("phone") ?? ""));
+            if (!phoneCheck.ok) { setError(phoneCheck.error); return; }
             setBusy(true);
             setError("");
             try {
-              await completeGoogleProfile(String(data.get("name")), String(data.get("phone")));
+              await completeGoogleProfile(nameCheck.value, phoneCheck.value);
               await navigate({ to: "/patient/dashboard" });
             } catch (error) {
               setError(friendlyError(error));
@@ -57,14 +62,14 @@ export function CompleteProfile() {
             autoComplete="name"
             defaultValue={profile.fullName}
             required
-            maxLength={120}
+            maxLength={MAX_FULL_NAME_LENGTH}
           />
           <Field
             label="Phone"
             name="phone"
             type="tel"
             autoComplete="tel"
-            pattern="[+0-9 ()-]{6,30}"
+            maxLength={MAX_PHONE_LENGTH}
             required
           />
           {error && (

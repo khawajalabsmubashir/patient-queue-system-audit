@@ -45,6 +45,8 @@ export async function login(
     method: "POST",
     body: { email: email.trim(), password, portal },
   });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("queuecare:clear-cache"));
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("queuecare:clear-cache"));
   if (request === revision) publish(profile);
   return profile;
 }
@@ -54,11 +56,13 @@ export async function register(fullName: string, email: string, phone: string, p
     method: "POST",
     body: { fullName: fullName.trim(), email: email.trim(), phone: phone.trim(), password },
   });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("queuecare:clear-cache"));
   if (request === revision) publish(profile);
   return profile;
 }
 export async function logout() {
   await api("/auth/logout", { method: "POST", body: {} });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("queuecare:clear-cache"));
   ++revision;
   publish(null);
 }
@@ -73,6 +77,7 @@ export async function completeGoogleProfile(fullName: string, phone: string) {
     method: "POST",
     body: { fullName: fullName.trim(), phone: phone.trim() },
   });
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("queuecare:clear-cache"));
   if (request === revision) publish(profile);
   return profile;
 }

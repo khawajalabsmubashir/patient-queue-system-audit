@@ -14,6 +14,17 @@ import { BillingWorkspace } from "@/components/billing-workspace";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { PatientPicker } from "@/components/patient-picker";
 import { logout } from "@/services/auth";
+import { runAction } from "@/services/queue";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { friendlyError } from "@/services/errors";
 import type { Appointment, ClinicConfig } from "@/types/local";
 import type { PatientProfile, Vitals } from "@/types/clinical";
@@ -52,7 +63,8 @@ function Workspace() {
     [prepPatientId, setPrepPatientId] = useState<string | null>(null),
     [patient, setPatient] = useState<string | null>(null),
     [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null),
-    [lookup, setLookup] = useState<{ id: string; name: string } | null>(null);
+    [lookup, setLookup] = useState<{ id: string; name: string } | null>(null),
+    [confirmLogout, setConfirmLogout] = useState(false);
   const nurse = profile?.role === "nurse";
   useEffect(() => {
     const reload = () => remote.reload();
@@ -129,7 +141,7 @@ function Workspace() {
           <a className="text-sm text-primary" href="/account">
             Account
           </a>
-          <Btn variant="ghost" onClick={() => void logout()}>
+          <Btn type="button" variant="ghost" onClick={() => setConfirmLogout(true)}>
             Sign out
           </Btn>
         </div>
@@ -335,6 +347,27 @@ function Workspace() {
           </>
         )}
       </main>
+      <AlertDialog open={confirmLogout} onOpenChange={setConfirmLogout}>
+        <AlertDialogContent className="max-w-[calc(100vw-2rem)] rounded-2xl sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Any unsaved work will be lost. You will need to sign in again to access the clinic staff workspace.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setConfirmLogout(false);
+                void runAction(logout, "Signed out.");
+              }}
+            >
+              Yes, Sign Out
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

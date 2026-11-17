@@ -2,7 +2,7 @@ import { ApiError } from "../middleware/auth.ts";
 export const medicalBucket = "queuecare-medical";
 export interface DocumentStorage {
   uploadUrl(path: string): Promise<string>;
-  read(path: string): Promise<Uint8Array>;
+  read(path: string, maxBytes?: number): Promise<Uint8Array>;
   signedUrl(path: string): Promise<string>;
   remove(path: string): Promise<void>;
 }
@@ -36,11 +36,11 @@ export class SupabaseDocumentStorage implements DocumentStorage {
     ).json();
     return process.env["SUPABASE_URL"] + "/storage/v1" + r.url;
   }
-  async read(path: string) {
+  async read(path: string, maxBytes = 10485760) {
     const r = await this.request("object/authenticated/" + medicalBucket + "/" + path);
     const size = Number(r.headers.get("content-length"));
-    if (size > 10485760)
-      throw new ApiError(400, "FILE_TOO_LARGE", "Files must be no larger than 10 MB.");
+    if (size > maxBytes)
+      throw new ApiError(400, "FILE_TOO_LARGE", `Files must be no larger than ${Math.round(maxBytes / 1048576)} MB.`);
     return new Uint8Array(await r.arrayBuffer());
   }
   async signedUrl(path: string) {

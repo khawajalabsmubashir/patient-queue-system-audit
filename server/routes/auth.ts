@@ -3,6 +3,7 @@ import type { Database } from "../db/database.ts";
 import { randomUUID } from "node:crypto";
 import { compare, hash, hashSync } from "bcryptjs";
 import { z } from "zod";
+import { validatePersonName, validatePhoneNumber } from "../../src/lib/input-validation.ts";
 import { one, type UserRow } from "../db/database.ts";
 import {
   ApiError,
@@ -31,11 +32,20 @@ const loginCredentials = credentials.extend({
 });
 const registration = credentials
   .extend({
-    fullName: z.string().trim().min(1).max(120),
+    fullName: z
+      .string()
+      .superRefine((val, ctx) => {
+        const check = validatePersonName(val, "Full name", { strictAllowlist: false });
+        if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+      })
+      .transform((val) => val.trim().replace(/\s+/g, " ")),
     phone: z
       .string()
-      .trim()
-      .regex(/^[+0-9 ()-]{6,30}$/, "Enter a valid phone number."),
+      .superRefine((val, ctx) => {
+        const check = validatePhoneNumber(val);
+        if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+      })
+      .transform((val) => val.trim().replace(/\s+/g, " ")),
   })
   .strict();
 const unusedHash = hashSync("unassigned-authentication-account", 12);

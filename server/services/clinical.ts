@@ -5,6 +5,7 @@ import { z } from "zod";
 import { atomic, one, many, type Database } from "../db/database.ts";
 import { ApiError } from "../middleware/auth.ts";
 import { clinicValue } from "./queueService.ts";
+import { validatePersonName, validatePhoneNumber } from "../../src/lib/input-validation.ts";
 import type {
   PatientProfile,
   ClinicalVisit,
@@ -37,8 +38,14 @@ const date = z
   .nullable();
 export const demographicsSchema = z
   .object({
-    fullName: z.string().trim().min(2).max(120),
-    phone: z.string().trim().min(7).max(30),
+    fullName: z.string().superRefine((val, ctx) => {
+      const check = validatePersonName(val, "Full name");
+      if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+    }).transform((val) => val.trim().replace(/\s+/g, " ")),
+    phone: z.string().superRefine((val, ctx) => {
+      const check = validatePhoneNumber(val);
+      if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+    }).transform((val) => val.trim().replace(/\s+/g, " ")),
     dateOfBirth: date.refine(
       (s) => !s || s <= patientToday(),
       "Date of birth cannot be in the future.",
@@ -191,26 +198,14 @@ export async function saveProfile(
 }
 const select =
   "SELECT e.*,u.full_name patient_name,c.name clinic_name,c.address clinic_address,c.phone clinic_phone,d.full_name doctor_name,t.token_code,a.scheduled_at appointment_at FROM encounters e JOIN users u ON u.id=e.patient_id JOIN clinics c ON c.id=e.clinic_id JOIN users d ON d.id=e.doctor_id LEFT JOIN tokens t ON t.id=e.token_id LEFT JOIN appointments a ON a.id=e.appointment_id";
-export async function visitDetail(
-  db: Database,
-  id: string,
-  patientId?: string,
-): Promise<ClinicalVisit | PatientVisit> {
-  const e = await one<Row>(
-    db,
-    select + " WHERE e.id=?" + (patientId ? " AND e.patient_id=? AND e.status='completed'" : ""),
-    id,
-    ...(patientId ? [patientId] : []),
-  );
-  if (!e) throw new ApiError(404, "VISIT_NOT_FOUND", "Visit not found.");
-  const p = await one<Row>(db, "SELECT * FROM prescriptions WHERE encounter_id=?", id);
-  const items = p
-    ? await many<Row>(
-        db,
-        "SELECT i.medicine,i.dose,i.frequency,i.duration,i.instructions,d.strength,d.dosage_form,d.catalog_id FROM prescription_items i LEFT JOIN prescription_item_details d ON d.item_id=i.id WHERE i.prescription_id=? ORDER BY i.position",
-        str(p, "id"),
-      )
-    : [];
+function mapVisitRow(
+  e: Row,
+  p: Row | undefined,
+  items: Row[],
+  vitalsRow: Row | undefined,
+  portal: boolean,
+): ClinicalVisit | PatientVisit {
+  const id = str(e, "id");
   const common: PatientVisit = {
     id,
     patientId: str(e, "patient_id"),
@@ -248,8 +243,8 @@ export async function visitDetail(
     },
   };
   // Explicit patient projection: never return e.*, private notes, drafts or clinical working notes.
-  if (patientId) return common;
-  const v = (await one<Row>(db, "SELECT * FROM visit_vitals WHERE encounter_id=?", id)) ?? {};
+  if (portal) return common;
+  const v = vitalsRow ?? {};
   const value = (k: string) => (v[k] == null ? null : Number(v[k]));
   const vitals: Vitals = {
     systolic: value("systolic"),
@@ -280,16 +275,81 @@ export async function visitDetail(
     vitals,
   };
 }
+export async function visitDetail(
+  db: Database,
+  id: string,
+  patientId?: string,
+): Promise<ClinicalVisit | PatientVisit> {
+  const e = await one<Row>(
+    db,
+    select + " WHERE e.id=?" + (patientId ? " AND e.patient_id=? AND e.status='completed'" : ""),
+    id,
+    ...(patientId ? [patientId] : []),
+  );
+  if (!e) throw new ApiError(404, "VISIT_NOT_FOUND", "Visit not found.");
+  const p = await one<Row>(db, "SELECT * FROM prescriptions WHERE encounter_id=?", id);
+  const items = p
+    ? await many<Row>(
+        db,
+        "SELECT i.medicine,i.dose,i.frequency,i.duration,i.instructions,d.strength,d.dosage_form,d.catalog_id FROM prescription_items i LEFT JOIN prescription_item_details d ON d.item_id=i.id WHERE i.prescription_id=? ORDER BY i.position",
+        str(p, "id"),
+      )
+    : [];
+  const vitalsRow = patientId
+    ? undefined
+    : await one<Row>(db, "SELECT * FROM visit_vitals WHERE encounter_id=?", id);
+  return mapVisitRow(e, p, items, vitalsRow, Boolean(patientId));
+}
 export async function visits(db: Database, patientId: string, portal = false) {
   await patient(db, patientId);
-  const ids = await many<{ id: string }>(
-    db,
-    "SELECT id FROM encounters WHERE patient_id=?" +
-      (portal ? " AND status='completed'" : "") +
-      " ORDER BY visit_at DESC,id DESC LIMIT 200",
-    patientId,
-  );
-  return Promise.all(ids.map((v) => visitDetail(db, v.id, portal ? patientId : undefined)));
+  const portalFilter = portal ? " AND e.status='completed'" : "";
+  const [encounters, prescriptions, allItems, allVitals] = await Promise.all([
+    many<Row>(
+      db,
+      select +
+        " WHERE e.patient_id=?" +
+        portalFilter +
+        " ORDER BY e.visit_at DESC,e.id DESC LIMIT 200",
+      patientId,
+    ),
+    many<Row>(
+      db,
+      "SELECT p.* FROM prescriptions p JOIN encounters e ON e.id=p.encounter_id WHERE e.patient_id=?" +
+        portalFilter,
+      patientId,
+    ),
+    many<Row>(
+      db,
+      "SELECT i.prescription_id,i.medicine,i.dose,i.frequency,i.duration,i.instructions,d.strength,d.dosage_form,d.catalog_id FROM prescription_items i JOIN prescriptions p ON p.id=i.prescription_id JOIN encounters e ON e.id=p.encounter_id LEFT JOIN prescription_item_details d ON d.item_id=i.id WHERE e.patient_id=?" +
+        portalFilter +
+        " ORDER BY i.position",
+      patientId,
+    ),
+    portal
+      ? Promise.resolve([] as Row[])
+      : many<Row>(
+          db,
+          "SELECT v.* FROM visit_vitals v JOIN encounters e ON e.id=v.encounter_id WHERE e.patient_id=?",
+          patientId,
+        ),
+  ]);
+  const rxByEncounter = new Map<string, Row>();
+  for (const p of prescriptions) rxByEncounter.set(str(p, "encounter_id"), p);
+  const itemsByRx = new Map<string, Row[]>();
+  for (const item of allItems) {
+    const pid = str(item, "prescription_id");
+    const bucket = itemsByRx.get(pid);
+    if (bucket) bucket.push(item);
+    else itemsByRx.set(pid, [item]);
+  }
+  const vitalsByEncounter = new Map<string, Row>();
+  for (const v of allVitals) vitalsByEncounter.set(str(v, "encounter_id"), v);
+  return encounters.map((e) => {
+    const eid = str(e, "id");
+    const p = rxByEncounter.get(eid);
+    const items = p ? (itemsByRx.get(str(p, "id")) ?? []) : [];
+    return mapVisitRow(e, p, items, vitalsByEncounter.get(eid), portal);
+  });
 }
 export async function startVisit(
   db: Database,

@@ -7,33 +7,116 @@ import { api } from "@/api/client";
 import { Btn, PageHeader } from "@/components/qc";
 import { friendlyError } from "@/services/errors";
 import type { ClinicalVisit, PatientVisit } from "@/types/clinical";
-export function useClinicalData<T>(path: string | null) {
-  const [data, setData] = useState<T | null>(null),
-    [error, setError] = useState(""),
-    [attempt, setAttempt] = useState(0);
-  const loadedPath = useRef<string | null>(null);
-  const reload = useCallback(() => setAttempt((n) => n + 1), []);
+type CacheEntry = { data: unknown; fetchedAt: number; stale: boolean };
+const CLINICAL_STALE_MS = 10_000;
+const clinicalCache = new Map<string, CacheEntry>();
+const inFlightRequests = new Map<string, Promise<unknown>>();
+let listenersRegistered = false;
+
+export function clearClinicalCache() {
+  clinicalCache.clear();
+  inFlightRequests.clear();
+}
+
+export function invalidateClinicalCache(prefix?: string) {
+  for (const [key, entry] of clinicalCache.entries()) {
+    if (!prefix || key.startsWith(prefix)) {
+      entry.stale = true;
+    }
+  }
+}
+
+function ensureCacheListeners() {
+  if (listenersRegistered || typeof window === "undefined") return;
+  listenersRegistered = true;
+  window.addEventListener("queuecare:invalidate-cache", () => invalidateClinicalCache());
+  window.addEventListener("queuecare:refresh", () => invalidateClinicalCache());
+  window.addEventListener("queuecare:updated", () => invalidateClinicalCache());
+  window.addEventListener("queuecare:clear-cache", () => clearClinicalCache());
+  window.addEventListener("queuecare:session-expired", () => clearClinicalCache());
+}
+
+function fetchClinical<T>(path: string, force = false): Promise<T> {
+  ensureCacheListeners();
+  const existing = !force ? inFlightRequests.get(path) : undefined;
+  if (existing) return existing as Promise<T>;
+  const req = api<T>(path)
+    .then((next) => {
+      clinicalCache.set(path, { data: next, fetchedAt: Date.now(), stale: false });
+      return next;
+    })
+    .finally(() => {
+      if (inFlightRequests.get(path) === req) {
+        inFlightRequests.delete(path);
+      }
+    });
+  inFlightRequests.set(path, req);
+  return req;
+}
+
+export function prefetchClinicalData(path: string | null) {
+  if (!path) return;
+  ensureCacheListeners();
+  const cached = clinicalCache.get(path);
+  if (cached && !cached.stale && Date.now() - cached.fetchedAt < CLINICAL_STALE_MS) return;
+  void fetchClinical(path).catch(() => {});
+}
+
+export function useClinicalData<T>(
+  path: string | null,
+  options?: { keepPreviousData?: boolean },
+) {
+  ensureCacheListeners();
+  const cached = path ? (clinicalCache.get(path) as CacheEntry | undefined) : undefined;
+  const [data, setData] = useState<T | null>(() => (cached ? (cached.data as T) : null));
+  const [error, setError] = useState("");
+  const [attempt, setAttempt] = useState(0);
+  const loadedPath = useRef<string | null>(cached && path ? path : null);
+  const reload = useCallback(() => {
+    if (path) {
+      const entry = clinicalCache.get(path);
+      if (entry) entry.stale = true;
+    }
+    setAttempt((n) => n + 1);
+  }, [path]);
+
   useEffect(() => {
     if (!path) {
       setData(null);
       loadedPath.current = null;
       return;
     }
-    const c = new AbortController();
-    if (loadedPath.current !== path) setData(null);
+    let active = true;
+    const entry = clinicalCache.get(path);
+    if (entry) {
+      loadedPath.current = path;
+      setData(entry.data as T);
+      const fresh = !entry.stale && Date.now() - entry.fetchedAt < CLINICAL_STALE_MS;
+      if (fresh && attempt === 0) {
+        setError("");
+        return () => {
+          active = false;
+        };
+      }
+    } else if (loadedPath.current !== path && !options?.keepPreviousData) {
+      setData(null);
+    }
     setError("");
-    api<T>(path, { signal: c.signal })
+    fetchClinical<T>(path, attempt > 0)
       .then((next) => {
-        if (!c.signal.aborted) {
+        if (active) {
           loadedPath.current = path;
           setData(next);
         }
       })
       .catch((e) => {
-        if (!c.signal.aborted) setError(friendlyError(e));
+        if (active) setError(friendlyError(e));
       });
-    return () => c.abort();
-  }, [path, attempt]);
+    return () => {
+      active = false;
+    };
+  }, [path, attempt, options?.keepPreviousData]);
+
   return { data, error, reload };
 }
 export function ClinicalLoading({ error, retry }: { error: string; retry: () => void }) {

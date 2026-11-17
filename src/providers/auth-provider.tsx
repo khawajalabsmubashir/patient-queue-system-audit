@@ -4,15 +4,21 @@ const Context = createContext<(AuthState & { retry: () => void }) | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
   const state = useSyncExternalStore(subscribeAuth, authSnapshot, authSnapshot);
   useEffect(() => {
+    let lastCheckedAt = 0;
     const restore = () => {
+      lastCheckedAt = Date.now();
       void restoreSession();
+    };
+    const restoreOnFocus = () => {
+      if (Date.now() - lastCheckedAt < 60_000) return;
+      restore();
     };
     restore();
     window.addEventListener("queuecare:session-expired", restore);
-    window.addEventListener("focus", restore);
+    window.addEventListener("focus", restoreOnFocus);
     return () => {
       window.removeEventListener("queuecare:session-expired", restore);
-      window.removeEventListener("focus", restore);
+      window.removeEventListener("focus", restoreOnFocus);
     };
   }, []);
   return (

@@ -74,3 +74,10 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+
+import { afterEach } from "vitest";
+afterEach(() => {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new Event("queuecare:clear-cache"));
+  }
+});

@@ -24,7 +24,7 @@ const fileSchema = z
     ]),
     filename: z.string().min(1).max(240),
     mime: z.enum(["application/pdf", "image/jpeg", "image/png"]),
-    size: z.number().int().min(1).max(10485760),
+    size: z.number().int().min(1).max(5242880),
   })
   .strict();
 const medicineSchema = z
@@ -232,10 +232,10 @@ export function clinicalWorkflowRoutes(db: Database, provided?: DocumentStorage)
     if (f["status"] !== "pending" || Number(f["expires_at"]) < Date.now())
       throw new ApiError(409, "UPLOAD_EXPIRED", "Prepare a new upload and try again.");
     try {
-      const bytes = await storage.read(String(f["storage_path"]));
+      const bytes = await storage.read(String(f["storage_path"]), 5242880);
       if (
         bytes.length !== f["file_size"] ||
-        bytes.length > 10485760 ||
+        bytes.length > 5242880 ||
         actualMime(bytes) !== f["mime_type"]
       )
         throw new ApiError(

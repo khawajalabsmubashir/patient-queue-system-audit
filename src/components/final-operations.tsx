@@ -801,21 +801,21 @@ export function PatientSummary() {
   const hasCareData = cards.length > 0 || d.followups.length > 0 || d.notifications.length > 0;
   return (
     <section className="mt-8">
-      <h2 className="mb-4 text-lg font-semibold">Your care summary</h2>
+      <h2 className="mb-4 text-lg font-semibold tracking-tight">Your care summary</h2>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {d.appointment ? (
           <a
             href="/patient/appointments"
-            className="surface block p-5 focus:ring-2 focus:ring-primary"
+            className="surface block p-5 transition hover:border-primary/40 hover:shadow-lift focus:ring-2 focus:ring-primary"
           >
-            <h3 className="text-sm font-medium">Upcoming appointment</h3>
+            <h3 className="text-sm font-semibold">Upcoming appointment</h3>
             <p className="mt-2 break-words text-sm text-muted-foreground">
               {d.appointment.scheduled_at.replace("T", " ") + " · " + d.appointment.clinic_name}
             </p>
           </a>
         ) : (
           <div className="surface p-5">
-            <h3 className="text-sm font-medium">Upcoming appointment</h3>
+            <h3 className="text-sm font-semibold">Upcoming appointment</h3>
             <p className="mt-2 text-sm text-muted-foreground">
               No upcoming appointment. Choose an available time at {clinic.name}.
             </p>
@@ -828,8 +828,12 @@ export function PatientSummary() {
           </div>
         )}
         {cards.map(({ title, value, href }) => (
-          <a href={href} key={title} className="surface block p-5 focus:ring-2 focus:ring-primary">
-            <h3 className="text-sm font-medium">{title}</h3>
+          <a
+            href={href}
+            key={title}
+            className="surface block p-5 transition hover:border-primary/40 hover:shadow-lift focus:ring-2 focus:ring-primary"
+          >
+            <h3 className="text-sm font-semibold">{title}</h3>
             <p className="mt-2 break-words text-sm text-muted-foreground">{value}</p>
           </a>
         ))}
@@ -841,13 +845,13 @@ export function PatientSummary() {
       )}
       {d.followups.length > 0 && (
         <div className="surface mt-4 p-5">
-          <h3 className="font-medium">Follow-up recommendations</h3>
+          <h3 className="font-semibold">Follow-up recommendations</h3>
           {d.followups.map((f) => (
-            <div key={f.id} className="mt-3 text-sm">
-              <p>
+            <div key={f.id} className="mt-3 rounded-lg border border-border/70 bg-muted/30 p-3 text-sm">
+              <p className="font-medium">
                 {String(f.follow_up_date).slice(0, 10)} · {f.clinic_name} · {f.status}
               </p>
-              <p className="whitespace-pre-wrap break-words text-muted-foreground">
+              <p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">
                 {f.instructions || "Follow-up visit recommended."}
               </p>
             </div>
@@ -856,10 +860,10 @@ export function PatientSummary() {
       )}
       {d.notifications.length > 0 && (
         <div className="surface mt-4 p-5">
-          <h3 className="font-medium">Recent notifications</h3>
+          <h3 className="font-semibold">Recent notifications</h3>
           {d.notifications.map((n) => (
             <div key={n.id} className="mt-3 text-sm">
-              <p>{n.title}</p>
+              <p className="font-medium">{n.title}</p>
               <p className="text-muted-foreground">{n.message}</p>
             </div>
           ))}

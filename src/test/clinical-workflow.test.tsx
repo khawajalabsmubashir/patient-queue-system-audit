@@ -82,9 +82,9 @@ it("file selection rejects oversized files before requesting an upload", () => {
   const change = vi.fn();
   render(<AttachmentFields files={[]} onChange={change} />);
   const file = new File(["x"], "large.pdf", { type: "application/pdf" });
-  Object.defineProperty(file, "size", { value: 10485761 });
+  Object.defineProperty(file, "size", { value: 5242881 });
   fireEvent.change(screen.getByLabelText("Add supporting files"), { target: { files: [file] } });
-  expect(screen.getByRole("alert")).toHaveTextContent("10 MB");
+  expect(screen.getByRole("alert")).toHaveTextContent("5 MB");
   expect(change).not.toHaveBeenCalled();
   expect(f.api).not.toHaveBeenCalled();
 });

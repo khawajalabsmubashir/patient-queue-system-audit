@@ -9,15 +9,25 @@ export const Route = createFileRoute("/admin/patients")({ component: Patients })
 export function Patients() {
   const { selected, clinics } = useClinicContext();
   const [q, setQ] = useState(""),
+    [debouncedQ, setDebouncedQ] = useState(""),
     [clinic, setClinic] = useState(selected),
     [group, setGroup] = useState(""),
-    [clinical, setClinical] = useState("");
+    [clinical, setClinical] = useState(""),
+    [debouncedClinical, setDebouncedClinical] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setDebouncedQ(q);
+      setDebouncedClinical(clinical);
+    }, 220);
+    return () => clearTimeout(t);
+  }, [q, clinical]);
   const groups = useClinicalData<Condition[]>(
     "/admin/conditions?clinicId=" + encodeURIComponent(clinic),
   );
   const remote = useClinicalData<PatientSearchRow[]>(
     "/admin/patients/search?" +
-      new URLSearchParams({ q, clinicId: clinic, conditionId: group, clinical }),
+      new URLSearchParams({ q: debouncedQ, clinicId: clinic, conditionId: group, clinical: debouncedClinical }),
+    { keepPreviousData: true },
   );
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout>;

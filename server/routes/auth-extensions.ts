@@ -2,6 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { z } from "zod";
+import { validatePersonName, validatePhoneNumber } from "../../src/lib/input-validation.ts";
 import { atomic, one, type Database, type UserRow } from "../db/database.ts";
 import { ApiError, publicUser, startSession, authCookieOptions } from "../middleware/auth.ts";
 import type { AuthOptions, GoogleIdentity } from "../services/identity.ts";
@@ -15,9 +16,23 @@ const email = z
   .transform((value) => value.toLowerCase());
 const phone = z
   .string()
-  .trim()
-  .regex(/^[+0-9 ()-]{6,30}$/, "Enter a valid phone number.");
-const profile = z.object({ fullName: z.string().trim().min(1).max(120), phone }).strict();
+  .superRefine((val, ctx) => {
+    const check = validatePhoneNumber(val);
+    if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+  })
+  .transform((val) => val.trim().replace(/\s+/g, " "));
+const profile = z
+  .object({
+    fullName: z
+      .string()
+      .superRefine((val, ctx) => {
+        const check = validatePersonName(val, "Full name", { strictAllowlist: false });
+        if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+      })
+      .transform((val) => val.trim().replace(/\s+/g, " ")),
+    phone,
+  })
+  .strict();
 const password = z
   .string()
   .min(8, "Use at least 8 characters.")
