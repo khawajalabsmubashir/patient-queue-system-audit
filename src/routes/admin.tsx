@@ -149,8 +149,8 @@ function AdminLayoutContent() {
           <div className="grid size-8 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-accent-foreground">
             {initials}
           </div>
-          <div className="text-sm leading-tight">
-            <div className="font-medium">{profile?.fullName}</div>
+          <div className="min-w-0 flex-1 text-sm leading-tight">
+            <div className="truncate font-medium">{profile?.fullName}</div>
             <div className="text-xs text-muted-foreground">Doctor / Administrator</div>
           </div>
         </button>
@@ -166,7 +166,7 @@ function AdminLayoutContent() {
           <AdminNavigation onNavigate={() => setMenu(false)} />
           <button
             type="button"
-            className="mt-8 block rounded-lg px-3 py-3 text-sm hover:bg-sidebar-accent"
+            className="mt-8 block w-full break-words [overflow-wrap:anywhere] rounded-lg px-3 py-3 text-left text-sm hover:bg-sidebar-accent"
             onClick={() => {
               setMenu(false);
               setConfirmLogout(true);

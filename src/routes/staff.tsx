@@ -132,7 +132,7 @@ function Workspace() {
     <div className="min-h-screen">
       <header className="flex flex-wrap items-center gap-4 border-b border-border px-5 py-4 md:px-8">
         <Logo />
-        <span className="text-sm text-muted-foreground">
+        <span className="min-w-0 max-w-full break-words [overflow-wrap:anywhere] text-sm text-muted-foreground">
           {profile?.fullName} · {nurse ? "Nurse / Assistant" : "Receptionist"}
         </span>
         <div className="ml-auto flex max-w-full flex-wrap items-center gap-3">
@@ -237,7 +237,7 @@ function Workspace() {
                       className="flex flex-wrap items-center justify-between gap-4 p-5"
                     >
                       <div>
-                        <p className="font-medium">
+                        <p className="break-words [overflow-wrap:anywhere] font-medium">
                           {t.tokenCode} · {t.patientName}
                         </p>
                         <p className="mt-1 text-sm text-muted-foreground">
@@ -286,7 +286,7 @@ function Workspace() {
                 <div className="surface divide-y divide-border">
                   {state.appointments.map((a) => (
                     <article key={a.id} className="space-y-3 p-5">
-                      <p className="font-medium">{a.patientName}</p>
+                      <p className="break-words [overflow-wrap:anywhere] font-medium">{a.patientName}</p>
                       <p className="text-sm">
                         {a.scheduledAt.replace("T", " ")} · {a.status}
                       </p>

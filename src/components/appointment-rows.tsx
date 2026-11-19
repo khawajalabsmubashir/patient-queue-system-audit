@@ -153,10 +153,10 @@ export function AppointmentRows({
           </span>
           <div className="min-w-0">
           {readOnly ? (
-            <span className="break-words font-medium">{a.patientName}</span>
+            <span className="break-words [overflow-wrap:anywhere] font-medium">{a.patientName}</span>
               ) : (
                 <a
-                  className="break-words font-medium hover:text-primary"
+                  className="break-words [overflow-wrap:anywhere] font-medium hover:text-primary"
                   href={
                     "/admin/patient-record/" +
                     a.patientId +

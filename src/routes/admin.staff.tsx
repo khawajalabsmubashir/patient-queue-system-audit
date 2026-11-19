@@ -79,7 +79,7 @@ function Staff() {
               label="Full name"
               defaultValue={editing?.name}
               required
-              minLength={2}
+              minLength={3}
               maxLength={120}
             />
             <Field name="email" label="Email" type="email" defaultValue={editing?.email} required />

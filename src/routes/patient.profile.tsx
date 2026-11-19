@@ -7,7 +7,7 @@ import { restoreSession } from "@/services/auth";
 import { PageHeader, Btn, Field } from "@/components/qc";
 import { ClinicalLoading, useClinicalData } from "@/components/clinical";
 import { friendlyError } from "@/services/errors";
-import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
+import { MAX_FULL_NAME_LENGTH, MIN_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
 import type { PatientProfile } from "@/types/clinical";
 export const Route = createFileRoute("/patient/profile")({ component: Profile });
 function Profile() {
@@ -57,7 +57,7 @@ function Profile() {
             label="Full name"
             name="fullName"
             required
-            minLength={2}
+            minLength={MIN_FULL_NAME_LENGTH}
             maxLength={MAX_FULL_NAME_LENGTH}
             defaultValue={p.fullName}
           />

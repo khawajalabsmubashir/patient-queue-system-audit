@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/api/client", () => ({ api: mocks.api }));
 vi.mock("@/services/auth", () => ({
   register: mocks.register,
+  login: vi.fn(),
   logout: mocks.logout,
 }));
 vi.mock("@/providers/auth-provider", () => ({
@@ -106,11 +107,14 @@ import { AttachmentFields } from "@/components/appointment-files";
 import { Appointments } from "@/routes/patient.appointments";
 import { PatientConditions } from "@/components/patient-conditions";
 import { AppointmentRows } from "@/components/appointment-rows";
+import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { Register } from "@/routes/register";
+import { Route as LoginRoute } from "@/routes/login";
+import { PageHeader } from "@/components/qc";
 import { Route as AdminRoute } from "@/routes/admin";
 import { Route as StaffRoute } from "@/routes/staff";
 import { Route as PatientRoute } from "@/routes/patient";
-import { validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
+import { validatePassword, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
 
 afterEach(() => {
   cleanup();
@@ -298,5 +302,158 @@ describe("Audit fixes verification", () => {
 
     expect(await screen.findByRole("alert")).toHaveTextContent(/disallowed/i);
     expect(mocks.register).not.toHaveBeenCalled();
+  });
+  it("Fix 8: Receptionist sees Book appointment button, can book walk-in/lookup patients, and open appointment details", async () => {
+    mocks.role = "receptionist";
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Karachi",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    mocks.api.mockImplementation((path: string, opts?: any) => {
+      if (path.includes("/staff/appointment-flow")) {
+        return Promise.resolve([
+          {
+            id: "appt-1",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            patientId: "p1",
+            patientName: "Existing Patient",
+            reason: "Checkup",
+            status: "scheduled",
+            scheduledAt: today + "T10:00",
+          },
+        ]);
+      }
+      if (path.includes("/staff/state")) {
+        return Promise.resolve({
+          clinic: { name: "Health Point" },
+          queue: [],
+          patients: [{ id: "p1", name: "Existing Patient", phone: "03001234567" }],
+          appointments: [],
+        });
+      }
+      if (path.includes("/staff/patient-lookup")) {
+        return Promise.resolve({ id: "p-lookup", name: "Lookup Patient" });
+      }
+      if (opts?.method === "POST" && path.includes("/staff/appointments")) {
+        return Promise.resolve({ id: "appt-new" });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<AppointmentCalendar />);
+    const bookBtn = await screen.findByRole("button", { name: "Book appointment" });
+    expect(bookBtn).toBeVisible();
+    fireEvent.click(bookBtn);
+
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByRole("button", { name: "Existing patient" })).toBeVisible();
+    expect(within(dialog).getByRole("button", { name: "Find by email" })).toBeVisible();
+    const walkInBtn = within(dialog).getByRole("button", { name: "New walk-in" });
+    fireEvent.click(walkInBtn);
+
+    fireEvent.change(within(dialog).getByLabelText("Patient full name"), {
+      target: { value: "Ali'; DROP TABLE users;--" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Phone number"), {
+      target: { value: "03009876543" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Book appointment" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent(/disallowed/i);
+    expect(mocks.api).not.toHaveBeenCalledWith(
+      expect.stringContaining("/staff/appointments"),
+      expect.objectContaining({ method: "POST" }),
+    );
+
+    fireEvent.change(within(dialog).getByLabelText("Patient full name"), {
+      target: { value: "Walkin Patient" },
+    });
+    fireEvent.click(within(dialog).getByRole("button", { name: "Book appointment" }));
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith("/staff/appointments?clinicId=clinic", {
+        method: "POST",
+        body: {
+          walkIn: { fullName: "Walkin Patient", phone: "03009876543" },
+          scheduledAt: "2026-12-20T10:00",
+          reason: "",
+        },
+      }),
+    );
+
+    const detailsBtn = await screen.findByRole("button", { name: "Appointment details" });
+    fireEvent.click(detailsBtn);
+    const manageDialog = await screen.findByRole("dialog");
+    expect(manageDialog).toHaveTextContent("Manage appointment");
+    expect(within(manageDialog).getByRole("button", { name: "Reschedule" })).toBeVisible();
+  });
+  it("BUG-01: Register and Login password fields include accessible Show/Hide eye toggle", () => {
+    render(<Register />);
+    const regPassword = screen.getByLabelText("Password") as HTMLInputElement;
+    const regConfirm = screen.getByLabelText("Confirm password") as HTMLInputElement;
+    expect(regPassword.type).toBe("password");
+    expect(regConfirm.type).toBe("password");
+    fireEvent.click(screen.getByRole("button", { name: "Show Password" }));
+    expect(regPassword.type).toBe("text");
+    fireEvent.click(screen.getByRole("button", { name: "Hide Password" }));
+    expect(regPassword.type).toBe("password");
+    fireEvent.click(screen.getByRole("button", { name: "Show Confirm password" }));
+    expect(regConfirm.type).toBe("text");
+
+    cleanup();
+    const LoginComponent = LoginRoute.options.component!;
+    render(<LoginComponent />);
+    const loginPassword = screen.getByLabelText("Password") as HTMLInputElement;
+    expect(loginPassword.type).toBe("password");
+    fireEvent.click(screen.getByRole("button", { name: "Show Password" }));
+    expect(loginPassword.type).toBe("text");
+  });
+
+  it("BUG-02, BUG-04, BUG-07: Rejects spaces-only passwords, 1-2 char names, and special-char-only names", async () => {
+    expect(validatePassword("         ").ok).toBe(false);
+    expect(validatePassword("   abc  ").ok).toBe(false);
+    expect(validatePassword("StrongPass123!").ok).toBe(true);
+
+    expect(validatePersonName("A", "Full name").ok).toBe(false);
+    expect(validatePersonName("Ab", "Full name").ok).toBe(false);
+    expect(validatePersonName("Ali", "Full name").ok).toBe(true);
+    expect(validatePersonName("@#$%^&&^%$#", "Full name").ok).toBe(false);
+    expect(validatePersonName("@#$%^&&^%$#", "Full name", { strictAllowlist: false }).ok).toBe(false);
+
+    render(<Register />);
+    fireEvent.change(screen.getByLabelText("Full name"), {
+      target: { value: "Ab" },
+    });
+    fireEvent.change(screen.getByLabelText("Email"), {
+      target: { value: "short@example.com" },
+    });
+    fireEvent.change(screen.getByLabelText("Phone"), {
+      target: { value: "03001234567" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "         " },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "         " },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create account/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/at least 3 characters/i);
+
+    fireEvent.change(screen.getByLabelText("Full name"), {
+      target: { value: "Valid Patient" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Create account/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/blank or contain only spaces/i);
+    expect(mocks.register).not.toHaveBeenCalled();
+  });
+
+  it("BUG-05: Long 80-character unbroken names wrap cleanly without horizontal overflow", () => {
+    const longName = "A".repeat(80);
+    render(<PageHeader title={longName} sub={longName} />);
+    const heading = screen.getByRole("heading", { name: longName });
+    expect(heading.className).toContain("break-words");
+    expect(heading.className).toContain("[overflow-wrap:anywhere]");
+    expect(heading.parentElement?.className).toContain("min-w-0");
   });
 });

@@ -242,7 +242,7 @@ export function Appointments() {
             {review && (
               <section className="space-y-3 rounded-lg border p-4">
                 <h2>Review your appointment</h2>
-                <p className="font-medium">Patient: {review.fullName}</p>
+                <p className="break-words [overflow-wrap:anywhere] font-medium">Patient: {review.fullName}</p>
                 <p>
                   {clinics.find((c) => c.id === clinicId)?.name} ·{" "}
                   {review.scheduledAt.replace("T", " ")}

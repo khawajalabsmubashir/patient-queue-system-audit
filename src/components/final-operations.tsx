@@ -8,6 +8,7 @@ import { useClinicContext } from "@/providers/clinic-provider";
 import { useAuth } from "@/providers/auth-provider";
 import { Btn, Field, PageHeader } from "@/components/qc";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
+import { validatePassword } from "@/domain/input-validation";
 import { friendlyError } from "@/services/errors";
 import { money } from "@/types/operations";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -684,7 +685,7 @@ export function AccountSettings() {
         sub="Manage your password and active Neuro Spine Care Center sessions."
       />
       <div className="surface space-y-5 p-6">
-        <p>
+        <p className="break-words [overflow-wrap:anywhere]">
           {d.profile.fullName} · {d.profile.email} · {d.profile.role}
         </p>
         <p className="text-sm">Google account: {d.googleLinked ? "Linked" : "Not linked"}</p>
@@ -699,7 +700,13 @@ export function AccountSettings() {
           onSubmit={(e) => {
             e.preventDefault();
             const f = new FormData(e.currentTarget);
-            if (f.get("newPassword") !== f.get("confirm")) {
+            const nextPw = String(f.get("newPassword") ?? "");
+            const pwCheck = validatePassword(nextPw, 12);
+            if (!pwCheck.ok) {
+              setError(pwCheck.error);
+              return;
+            }
+            if (nextPw !== String(f.get("confirm") ?? "")) {
               setError("New passwords must match.");
               return;
             }

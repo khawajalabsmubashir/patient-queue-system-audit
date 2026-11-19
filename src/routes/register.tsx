@@ -9,6 +9,7 @@ import {
   MAX_FULL_NAME_LENGTH,
   MAX_PHONE_LENGTH,
   MIN_FULL_NAME_LENGTH,
+  validatePassword,
   validatePersonName,
   validatePhoneNumber,
 } from "@/domain/input-validation";
@@ -39,6 +40,11 @@ export function Register() {
     const phoneCheck = validatePhoneNumber(rawPhone);
     if (!phoneCheck.ok) {
       setError(phoneCheck.error);
+      return;
+    }
+    const passwordCheck = validatePassword(password);
+    if (!passwordCheck.ok) {
+      setError(passwordCheck.error);
       return;
     }
     if (password !== confirm) {

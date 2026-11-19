@@ -19,6 +19,7 @@ import {
   wallTime,
 } from "../services/final.ts";
 import { clinicDayKey } from "../../src/domain/queue.js";
+import { validatePassword } from "../../src/domain/input-validation.ts";
 import type { Notify } from "./queue.ts";
 const text = z.string().trim().max(250),
   image = z.union([
@@ -538,9 +539,10 @@ export function finalRoutes(db: Database, notify: Notify) {
   r.put("/account/password", auth, async (req, res) => {
     const p = z
         .string()
-        .min(12)
-        .max(72)
-        .refine((x) => Buffer.byteLength(x, "utf8") <= 72),
+        .superRefine((x, ctx) => {
+          const check = validatePassword(x, 12);
+          if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+        }),
       c = z
         .object({ currentPassword: z.string().max(72), newPassword: p })
         .strict()

@@ -1,6 +1,6 @@
-import { useId } from "react";
+import { useId, useState, useSyncExternalStore } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { TemporalInput } from "@/components/form-controls";
-import { useSyncExternalStore } from "react";
 import { subscribePending, isQueueActionPending } from "@/services/queue";
 import { cn } from "@/lib/utils";
 import type { Status } from "@/lib/queue-store";
@@ -8,8 +8,8 @@ import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export function Logo({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center gap-2.5", className)}>
-      <div className="grid size-8 place-items-center rounded-lg bg-primary text-primary-foreground">
+    <div className={cn("flex min-w-0 items-center gap-2.5", className)}>
+      <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
         <svg
           viewBox="0 0 24 24"
           className="size-4"
@@ -21,7 +21,7 @@ export function Logo({ className }: { className?: string }) {
           <path d="M12 5v14M5 12h14" />
         </svg>
       </div>
-      <span className="min-w-0 text-[15px] font-semibold leading-tight tracking-tight">
+      <span className="min-w-0 truncate text-[15px] font-semibold leading-tight tracking-tight">
         Neuro Spine Care Center
       </span>
     </div>
@@ -60,6 +60,7 @@ type BtnProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: "primary" | "secondary" | "ghost" | "danger";
   size?: "md" | "lg";
 };
+
 export function Btn({ variant = "primary", size = "md", className, ...p }: BtnProps) {
   const pending = useSyncExternalStore(subscribePending, isQueueActionPending, () => false);
   return (
@@ -91,9 +92,15 @@ export function PageHeader({
 }) {
   return (
     <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
-      <div>
-        <h1 className="text-[28px] font-semibold tracking-tight md:text-[32px]">{title}</h1>
-        {sub && <p className="mt-1.5 text-[15px] text-muted-foreground">{sub}</p>}
+      <div className="min-w-0 flex-1">
+        <h1 className="break-words [overflow-wrap:anywhere] text-[28px] font-semibold tracking-tight md:text-[32px]">
+          {title}
+        </h1>
+        {sub && (
+          <p className="mt-1.5 break-words [overflow-wrap:anywhere] text-[15px] text-muted-foreground">
+            {sub}
+          </p>
+        )}
       </div>
       {right}
     </div>
@@ -113,6 +120,8 @@ export function Field({
   ...p
 }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
   const generatedId = useId();
+  const [showPassword, setShowPassword] = useState(false);
+
   if (["date", "time", "datetime-local"].includes(p.type ?? "")) {
     const id = p.id ?? generatedId;
     return (
@@ -124,12 +133,51 @@ export function Field({
       </div>
     );
   }
+
+  if (p.type === "password") {
+    const id = p.id ?? generatedId;
+    return (
+      <div className="block">
+        <label htmlFor={id} className="mb-1.5 block text-sm font-medium">
+          {label}
+        </label>
+        <div className="relative">
+          <input
+            {...p}
+            id={id}
+            type={showPassword ? "text" : "password"}
+            className={cn(
+              "h-11 w-full rounded-lg border border-input bg-card pl-3.5 pr-11 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10",
+              p.className,
+            )}
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword((prev) => !prev)}
+            aria-label={showPassword ? `Hide ${label}` : `Show ${label}`}
+            aria-pressed={showPassword}
+            className="absolute right-1.5 top-1/2 grid size-8 -translate-y-1/2 place-items-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {showPassword ? (
+              <EyeOff className="size-4" aria-hidden="true" />
+            ) : (
+              <Eye className="size-4" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <label className="block">
       <span className="mb-1.5 block text-sm font-medium">{label}</span>
       <input
         {...p}
-        className="h-11 w-full rounded-lg border border-input bg-card px-3.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10"
+        className={cn(
+          "h-11 w-full rounded-lg border border-input bg-card px-3.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10",
+          p.className,
+        )}
       />
     </label>
   );

@@ -73,10 +73,10 @@ function PatientLayoutContent() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-0">
+    <div className="min-h-screen overflow-x-clip bg-background pb-24 md:pb-0">
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur">
         <div className="mx-auto flex min-h-16 max-w-6xl flex-wrap items-center gap-3 px-5 py-3 md:gap-5">
-          <Link to="/patient/dashboard">
+          <Link to="/patient/dashboard" className="min-w-0">
             <Logo />
           </Link>
 
@@ -161,7 +161,7 @@ function PatientLayoutContent() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto max-w-6xl px-5 py-6 md:py-10"
+        className="mx-auto min-w-0 max-w-6xl px-5 py-6 md:py-10"
       >
         <nav
           aria-label="Patient records"

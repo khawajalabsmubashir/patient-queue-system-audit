@@ -138,13 +138,13 @@ function Dashboard() {
   const { profile } = useAuth();
   return (
     <>
-      <section className="surface mb-8 flex flex-col justify-between gap-6 bg-gradient-to-br from-card via-card to-primary-soft/45 p-6 md:flex-row md:items-center md:p-8">
-        <div>
+      <section className="surface mb-8 flex min-w-0 flex-col justify-between gap-6 overflow-hidden bg-gradient-to-br from-card via-card to-primary-soft/45 p-6 md:flex-row md:items-center md:p-8">
+        <div className="min-w-0 flex-1">
           <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
             <span className={`size-2 rounded-full ${open ? "bg-success" : "bg-muted-foreground"}`} />
             {clinic.name || "Selected clinic"} · {open ? "Queue open" : "Queue closed"}
           </div>
-          <h1 className="mt-3 text-[28px] font-semibold tracking-tight md:text-[34px]">
+          <h1 className="mt-3 break-words [overflow-wrap:anywhere] text-[28px] font-semibold tracking-tight md:text-[34px]">
             Good morning, {profile?.fullName.split(" ")[0]}
           </h1>
           <p className="mt-1.5 text-[15px] text-muted-foreground">

@@ -3,7 +3,7 @@ import type { Database } from "../db/database.ts";
 import { randomUUID } from "node:crypto";
 import { compare, hash, hashSync } from "bcryptjs";
 import { z } from "zod";
-import { validatePersonName, validatePhoneNumber } from "../../src/domain/input-validation.ts";
+import { validatePassword, validatePersonName, validatePhoneNumber } from "../../src/domain/input-validation.ts";
 import { one, type UserRow } from "../db/database.ts";
 import {
   ApiError,
@@ -15,9 +15,10 @@ import {
 } from "../middleware/auth.ts";
 const password = z
   .string()
-  .min(8, "Use a password with at least 8 characters.")
-  .max(72)
-  .refine((p) => Buffer.byteLength(p, "utf8") <= 72, "Password must be at most 72 UTF-8 bytes.");
+  .superRefine((val, ctx) => {
+    const check = validatePassword(val, 8);
+    if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+  });
 const credentials = z.object({
   email: z
     .string()
