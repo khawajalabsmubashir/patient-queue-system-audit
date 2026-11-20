@@ -55,6 +55,11 @@ export function queueRoutes(db: Database, notify: Notify) {
         city: c.city,
         area: c.area,
         department: c.department,
+        address: c.address,
+        phone: c.phone,
+        openingTime: c.openingTime,
+        closingTime: c.closingTime,
+        doctorName: c.doctorName,
       })),
     }),
   );

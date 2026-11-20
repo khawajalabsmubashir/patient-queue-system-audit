@@ -14,6 +14,7 @@ import { money } from "@/types/operations";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { logout } from "@/services/auth";
 import { NotificationCenter } from "@/components/notification-center";
+import { AppointmentStatusBadge } from "@/components/appointment-tokens";
 
 type Metrics = {
   patients: number;
@@ -790,9 +791,9 @@ export function PatientSummary() {
   }>("/patient/summary");
   if (!remote.data)
     return (
-      <div className="mt-6">
+      <section className="surface flex h-full flex-col justify-center p-6">
         <ClinicalLoading error={remote.error} retry={remote.reload} />
-      </div>
+      </section>
     );
   const d = remote.data;
   const cards: { title: string; value: string; href: string }[] = [];
@@ -814,76 +815,88 @@ export function PatientSummary() {
       value: money(d.bills.balance),
       href: "/patient/billing",
     });
-  const hasCareData = cards.length > 0 || d.followups.length > 0 || d.notifications.length > 0;
+  const hasCareData = cards.length > 0 || d.followups.length > 0;
   return (
-    <section className="mt-8">
-      <h2 className="mb-4 text-lg font-semibold tracking-tight">Your care summary</h2>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {d.appointment ? (
+    <section
+      aria-label="Your care summary"
+      className="surface flex h-full flex-col justify-between p-6"
+    >
+      <div>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Your care summary</h2>
           <a
-            href="/patient/appointments"
-            className="surface block p-5 transition hover:border-primary/40 hover:shadow-lift focus:ring-2 focus:ring-primary"
+            href="/patient/visits"
+            className="shrink-0 whitespace-nowrap text-xs font-medium text-primary hover:underline"
           >
-            <h3 className="text-sm font-semibold">Upcoming appointment</h3>
-            <p className="mt-2 break-words text-sm text-muted-foreground">
-              {d.appointment.scheduled_at.replace("T", " ") + " · " + d.appointment.clinic_name}
-            </p>
+            View records →
           </a>
-        ) : (
-          <div className="surface p-5">
-            <h3 className="text-sm font-semibold">Upcoming appointment</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              No upcoming appointment. Choose an available time at {clinic.name}.
-            </p>
+        </div>
+        <div className="mt-4 divide-y divide-border">
+          {d.appointment ? (
             <a
-              href="/patient/appointments?book=1"
-              className="mt-4 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-soft transition-all hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              href="/patient/appointments"
+              className="block py-3 first:pt-0 transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
-              Book Appointment
+              <div className="flex items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-foreground">Upcoming appointment</h3>
+                <AppointmentStatusBadge status="scheduled" />
+              </div>
+              <p className="tabular-nums mt-1 break-words text-sm text-muted-foreground">
+                {d.appointment.scheduled_at.replace("T", " ") + " · " + d.appointment.clinic_name}
+              </p>
             </a>
+          ) : (
+            <div className="py-3 first:pt-0">
+              <h3 className="text-sm font-semibold text-foreground">Upcoming appointment</h3>
+              <p className="mt-1 text-sm text-muted-foreground">
+                No upcoming appointment. Choose an available time at {clinic.name || "your clinic"}.
+              </p>
+              <a
+                href="/patient/appointments?book=1"
+                className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-soft transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                Book Appointment
+              </a>
+            </div>
+          )}
+          {cards.map(({ title, value, href }) => (
+            <a
+              href={href}
+              key={title}
+              className="flex items-center justify-between gap-3 py-3 transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            >
+              <div className="min-w-0">
+                <h3 className="text-sm font-semibold text-foreground">{title}</h3>
+                <p className="tabular-nums mt-0.5 break-words text-sm text-muted-foreground">
+                  {value}
+                </p>
+              </div>
+              <span className="shrink-0 text-xs font-medium text-primary">Open →</span>
+            </a>
+          ))}
+        </div>
+        {d.followups.length > 0 && (
+          <div className="mt-3 border-t border-border pt-3">
+            <h3 className="text-sm font-semibold text-foreground">Follow-up recommendations</h3>
+            <div className="mt-2 space-y-2">
+              {d.followups.map((f) => (
+                <div key={f.id} className="rounded-lg border border-border/70 bg-muted/30 p-3 text-sm">
+                  <p className="tabular-nums font-medium">
+                    {String(f.follow_up_date).slice(0, 10)} · {f.clinic_name} · {f.status}
+                  </p>
+                  <p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">
+                    {f.instructions || "Follow-up visit recommended."}
+                  </p>
+                </div>
+              ))}
+            </div>
           </div>
         )}
-        {cards.map(({ title, value, href }) => (
-          <a
-            href={href}
-            key={title}
-            className="surface block p-5 transition hover:border-primary/40 hover:shadow-lift focus:ring-2 focus:ring-primary"
-          >
-            <h3 className="text-sm font-semibold">{title}</h3>
-            <p className="mt-2 break-words text-sm text-muted-foreground">{value}</p>
-          </a>
-        ))}
       </div>
       {!hasCareData && (
-        <p className="surface mt-4 p-5 text-sm text-muted-foreground">
+        <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
           Your care summary will appear here after your first appointment or clinic visit.
         </p>
-      )}
-      {d.followups.length > 0 && (
-        <div className="surface mt-4 p-5">
-          <h3 className="font-semibold">Follow-up recommendations</h3>
-          {d.followups.map((f) => (
-            <div key={f.id} className="mt-3 rounded-lg border border-border/70 bg-muted/30 p-3 text-sm">
-              <p className="font-medium">
-                {String(f.follow_up_date).slice(0, 10)} · {f.clinic_name} · {f.status}
-              </p>
-              <p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">
-                {f.instructions || "Follow-up visit recommended."}
-              </p>
-            </div>
-          ))}
-        </div>
-      )}
-      {d.notifications.length > 0 && (
-        <div className="surface mt-4 p-5">
-          <h3 className="font-semibold">Recent notifications</h3>
-          {d.notifications.map((n) => (
-            <div key={n.id} className="mt-3 text-sm">
-              <p className="font-medium">{n.title}</p>
-              <p className="text-muted-foreground">{n.message}</p>
-            </div>
-          ))}
-        </div>
       )}
     </section>
   );

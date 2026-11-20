@@ -123,6 +123,9 @@ export async function giveUpToken(db: Database, patientId: string, tokenId: stri
       .prepare("UPDATE appointments SET status='cancelled',updated_at=? WHERE id=?")
       .run(stamp, t.appointment_id);
     await db
+      .prepare("UPDATE tokens SET status='cancelled',cancelled_at=?,updated_at=? WHERE id=?")
+      .run(stamp, stamp, t.id);
+    await db
       .prepare(
         "INSERT INTO appointment_workflow VALUES (?,?,?) ON CONFLICT(appointment_id) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at",
       )

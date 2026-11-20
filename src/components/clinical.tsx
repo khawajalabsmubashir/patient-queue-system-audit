@@ -40,7 +40,7 @@ function fetchClinical<T>(path: string, force = false): Promise<T> {
   ensureCacheListeners();
   const existing = !force ? inFlightRequests.get(path) : undefined;
   if (existing) return existing as Promise<T>;
-  const req = api<T>(path)
+  const req = Promise.resolve(api<T>(path))
     .then((next) => {
       clinicalCache.set(path, { data: next, fetchedAt: Date.now(), stale: false });
       return next;

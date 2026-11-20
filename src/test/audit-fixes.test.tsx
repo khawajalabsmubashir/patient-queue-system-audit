@@ -25,7 +25,19 @@ const mocks = vi.hoisted(() => ({
   pathname: "/patient/appointments",
   role: "patient" as "patient" | "admin" | "nurse" | "receptionist",
   clinics: [
-    { id: "clinic", name: "Health Point", city: "Karachi", area: "Clifton", active: true },
+    {
+      id: "clinic",
+      name: "Health Point",
+      city: "Karachi",
+      area: "Clifton",
+      address: "Plot 12, Clifton Block 5",
+      phone: "03001112233",
+      department: "Neurology",
+      doctorName: "Dr. Tariq",
+      openingTime: "09:00",
+      closingTime: "17:00",
+      active: true,
+    },
   ],
 }));
 
@@ -64,12 +76,16 @@ vi.mock("@/components/appointment-slot-picker", () => ({
     <input name="scheduledAt" aria-label="Available slot" defaultValue="2026-12-20T10:00" />
   ),
 }));
-vi.mock("@/components/queue-feedback", () => ({
-  Notifications: () => <div data-testid="notifications" />,
-  QueueBoundary: ({ children }: { children: ReactNode }) => (
-    <div data-testid="queue-boundary">{children}</div>
-  ),
-}));
+vi.mock("@/components/queue-feedback", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/queue-feedback")>();
+  return {
+    ...actual,
+    Notifications: () => <div data-testid="notifications" />,
+    QueueBoundary: ({ children }: { children: ReactNode }) => (
+      <div data-testid="queue-boundary">{children}</div>
+    ),
+  };
+});
 vi.mock("@/components/notification-center", () => ({
   NotificationCenter: () => <div data-testid="notification-center" />,
 }));
@@ -86,8 +102,9 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
     ...actual,
     useNavigate: () => mocks.navigate,
     useLocation: () => ({ pathname: mocks.pathname }),
-    Link: ({ to, children, className, onClick, onMouseEnter, onFocus, ...rest }: any) => (
+    Link: ({ to, children, className, onClick, onMouseEnter, onFocus, search: _search, activeProps: _activeProps, ...rest }: any) => (
       <a
+        {...rest}
         href={typeof to === "string" ? to : "#"}
         className={className}
         onClick={(e) => {
@@ -96,7 +113,6 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
         }}
         onMouseEnter={onMouseEnter}
         onFocus={onFocus}
-        aria-label={rest["aria-label"]}
       >
         {children}
       </a>
@@ -118,6 +134,8 @@ import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { Register } from "@/routes/register";
 import { Route as LoginRoute } from "@/routes/login";
 import { PageHeader } from "@/components/qc";
+import { AppointmentTokens } from "@/components/appointment-tokens";
+import { PatientSummary } from "@/components/final-operations";
 import { GoogleButton } from "@/components/google-button";
 import { AccountSettings } from "@/components/final-operations";
 import { Route as AdminRoute } from "@/routes/admin";
@@ -268,23 +286,59 @@ describe("Audit fixes verification", () => {
     expect(screen.queryByRole("button", { name: /Manage tags/i })).toBeNull();
   });
 
-  it("Fix 6: Account & security is a dedicated header nav button and records tabs render without QueueBoundary", () => {
+  it("Fix 6 & Home UI Task 1-2 & 8: Single main nav bar, profile dropdown with Account & security + Sign Out, QueueBoundary scoping, and Clinic footer", async () => {
+    mocks.api.mockResolvedValue({
+      clinic: {
+        display_name: "Health Point",
+        logo_url: "",
+        footer: "",
+        email: "care@healthpoint.pk",
+      },
+      doctor: null,
+    });
     mocks.pathname = "/patient/visits";
     const PatientComponent = PatientRoute.options.component!;
     render(<PatientComponent />);
 
-    const recordsNav = screen.getByRole("navigation", { name: "Patient records" });
-    expect(within(recordsNav).queryByText(/Account & security/i)).toBeNull();
-    expect(within(recordsNav).getByText("My profile")).toBeVisible();
-    expect(within(recordsNav).getByText("My visits")).toBeVisible();
+    // Only one primary nav bar; secondary Patient records bar is removed
+    expect(screen.queryByRole("navigation", { name: "Patient records" })).toBeNull();
+    const mainNav = screen.getByRole("navigation", { name: "Main navigation" });
+    expect(within(mainNav).getByText("Home")).toBeVisible();
+    expect(within(mainNav).getByText("My visits")).toBeVisible();
+    expect(within(mainNav).getByText("Appointments")).toBeVisible();
+    expect(within(mainNav).getByText("Billing")).toBeVisible();
 
+    // Sign Out & Account & security are NOT separate standalone navbar links/buttons
     const header = document.querySelector("header")!;
-    expect(within(header).getByRole("link", { name: /Account & security/i })).toHaveAttribute(
+    expect(within(header).queryByRole("button", { name: /^Sign Out$/i })).toBeNull();
+    expect(within(header).queryByRole("link", { name: /Account & security/i })).toBeNull();
+
+    // QueueBoundary remains omitted on non-queue visits route
+    expect(screen.queryByTestId("queue-boundary")).toBeNull();
+    expect(screen.getByTestId("route-outlet")).toBeVisible();
+
+    // Footer includes clinic details, non-duplicating quick links, support & copyright
+    const footer = document.querySelector("footer")!;
+    expect(footer).toHaveTextContent("Health Point");
+    expect(footer).toHaveTextContent("Plot 12, Clifton Block 5");
+    expect(footer).toHaveTextContent("03001112233");
+    expect(footer).toHaveTextContent(/All rights reserved/i);
+    expect(within(footer).getByRole("link", { name: /Medical documents/i })).toBeVisible();
+    expect(within(footer).queryByRole("link", { name: /^Live queue$/i })).toBeNull();
+
+    // Profile dropdown includes My profile, Account & security, and Sign Out -> confirmation prompt
+    const profileTrigger = within(header).getByRole("button", { name: "Profile menu" });
+    fireEvent.keyDown(profileTrigger, { key: "Enter", code: "Enter" });
+    expect(await screen.findByRole("menuitem", { name: /My profile/i })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /Account & security/i })).toHaveAttribute(
       "href",
       "/account",
     );
-    expect(screen.queryByTestId("queue-boundary")).toBeNull();
-    expect(screen.getByTestId("route-outlet")).toBeVisible();
+
+    const signOutItem = screen.getByRole("menuitem", { name: /Sign Out/i });
+    fireEvent.click(signOutItem);
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent(/Are you sure you want to sign out/i);
   });
 
   it("Fix 7: Validation rejects oversized name/phone and SQL/script injection on Register", async () => {
@@ -552,5 +606,71 @@ describe("Audit fixes verification", () => {
       window.dispatchEvent(new Event("pageshow"));
     });
     await waitFor(() => expect(btn).not.toBeDisabled());
+  });
+
+  it("Home UI Tasks 5-7: Shows color-coded appointment badges, retains cancelled appointments & omits Home Recent notifications", async () => {
+    mocks.api.mockImplementation((path: string) => {
+      if (path.includes("/patient/appointments")) {
+        return Promise.resolve([
+          {
+            id: "appt-active",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            scheduledAt: "2030-05-12T10:00",
+            status: "scheduled",
+            token: { id: "tok-1", tokenCode: "HP-010", status: "waiting" },
+          },
+          {
+            id: "appt-cancelled",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            scheduledAt: "2030-05-10T09:00",
+            status: "cancelled",
+            token: { id: "tok-2", tokenCode: "HP-009", status: "cancelled" },
+          },
+        ]);
+      }
+      if (path.includes("/patient/summary")) {
+        return Promise.resolve({
+          appointment: { scheduled_at: "2030-05-12T10:00", clinic_name: "Health Point" },
+          visit: { visit_at: "2026-10-08T09:00:00Z", clinic_name: "Health Point" },
+          prescription: null,
+          document: null,
+          bills: { balance: 0 },
+          followups: [],
+          notifications: [
+            { id: "n1", title: "Turn approaching", message: "Arrive soon" },
+          ],
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<AppointmentTokens />);
+    expect(await screen.findByText("HP-010")).toBeVisible();
+    expect(screen.getByText("Scheduled")).toBeVisible();
+    expect(screen.getByText("Recent & cancelled appointments")).toBeVisible();
+    expect(screen.getByText("Cancelled")).toBeVisible();
+    expect(screen.getByRole("link", { name: /View full appointment history/i })).toHaveAttribute(
+      "href",
+      "/patient/appointments",
+    );
+    cleanup();
+
+    render(<PatientSummary />);
+    expect(await screen.findByText("Your care summary")).toBeVisible();
+    expect(screen.getByText("Scheduled")).toBeVisible();
+    // Task 7: Recent notifications section is completely removed from Home Page
+    expect(screen.queryByText(/Recent notifications/i)).toBeNull();
+    expect(screen.queryByText("Turn approaching")).toBeNull();
+    cleanup();
+
+    // Appointments page renders status badges and Cancelled filter tab works
+    render(<Appointments />);
+    expect(await screen.findByText(/HP-010/)).toBeVisible();
+    const cancelledTab = screen.getByRole("tab", { name: /Cancelled/i });
+    fireEvent.click(cancelledTab);
+    expect(screen.getByText(/HP-009/)).toBeVisible();
+    expect(screen.queryByText(/HP-010/)).toBeNull();
   });
 });

@@ -5,7 +5,7 @@ import {
   type SelectedAttachment,
 } from "@/components/appointment-files";
 import type { PatientProfile } from "@/types/clinical";
-import { TokenActions } from "@/components/appointment-tokens";
+import { AppointmentStatusBadge, TokenActions } from "@/components/appointment-tokens";
 import { ClinicLocationPicker } from "@/components/clinic-location-picker";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Btn } from "@/components/qc";
@@ -46,13 +46,21 @@ export function Appointments() {
     token: { id: string; tokenCode: string; status: string };
     scheduledAt: string;
   } | null>(null);
-  const [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [refresh, setRefresh] = useState(0);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "completed" | "cancelled">("all");
+  const [refresh, setRefresh] = useState(0);
+  const filteredAppointments = (remote.data ?? []).filter((a) => {
+    if (statusFilter === "upcoming")
+      return !["cancelled", "completed", "no_show"].includes(a.status);
+    if (statusFilter === "completed") return a.status === "completed";
+    if (statusFilter === "cancelled") return a.status === "cancelled" || a.status === "no_show";
+    return true;
+  });
   return (
     <>
       <PageHeader title="My appointments" sub="Appointments across your clinics." />
-      <div className="mb-5">
+      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
         <Btn
           onClick={() => {
             setBooking(true);
@@ -65,6 +73,37 @@ export function Appointments() {
         >
           Book appointment
         </Btn>
+        {remote.data && remote.data.length > 0 && (
+          <div
+            role="tablist"
+            aria-label="Filter appointments by status"
+            className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-card p-1"
+          >
+            {(
+              [
+                ["all", "All"],
+                ["upcoming", "Upcoming"],
+                ["completed", "Completed"],
+                ["cancelled", "Cancelled"],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                role="tab"
+                aria-selected={statusFilter === key}
+                onClick={() => setStatusFilter(key)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
+                  statusFilter === key
+                    ? "bg-primary-soft text-primary font-semibold"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
       {confirmed && (
         <section className="surface mb-5 p-6" role="status">
@@ -108,12 +147,14 @@ export function Appointments() {
         <ClinicalLoading error={remote.error} retry={remote.reload} />
       ) : (
         <div className="surface divide-y divide-border">
-          {remote.data.map((a) => (
+          {filteredAppointments.map((a) => (
             <article key={a.id} className="p-5">
-              <h2 className="font-medium">{a.clinicName}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                {a.scheduledAt.slice(0, 10)} {appointmentTimeLabel(a.scheduledAt.slice(11))} ·{" "}
-                {a.status}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="font-medium">{a.clinicName}</h2>
+                <AppointmentStatusBadge status={a.status} />
+              </div>
+              <p className="tabular-nums mt-1 text-sm text-muted-foreground">
+                {a.scheduledAt.slice(0, 10)} {appointmentTimeLabel(a.scheduledAt.slice(11))}
               </p>
               {a.reason && <p className="mt-1 text-sm">{a.reason}</p>}
               {a.token && (
@@ -127,8 +168,12 @@ export function Appointments() {
               </a>
             </article>
           ))}
-          {!remote.data.length && (
-            <p className="p-6 text-sm text-muted-foreground">No appointments scheduled.</p>
+          {!filteredAppointments.length && (
+            <p className="p-6 text-sm text-muted-foreground">
+              {remote.data.length
+                ? "No appointments match this status filter."
+                : "No appointments scheduled."}
+            </p>
           )}
         </div>
       )}

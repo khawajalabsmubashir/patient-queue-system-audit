@@ -3,22 +3,20 @@ import { PatientSummary } from "@/components/final-operations";
 import { useAuth } from "@/providers/auth-provider";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
-  ArrowRight,
   BellRing,
   CalendarPlus,
   ClipboardList,
   Clock,
   MapPin,
-  Phone,
   Pill,
   Receipt,
   Ticket,
   Users,
 } from "lucide-react";
-import { formatTime, useQueue } from "@/lib/queue-store";
+import { useQueue } from "@/lib/queue-store";
+import { Btn, Label, LiveDot, StatusPill } from "@/components/qc";
 import { PatientStatus } from "@/components/queue-feedback";
 import { prefetchClinicalData } from "@/components/clinical";
-import { Btn, Label, LiveDot, StatusPill } from "@/components/qc";
 
 export const Route = createFileRoute("/patient/dashboard")({
   head: () => ({
@@ -148,10 +146,10 @@ function Dashboard() {
             Good morning, {profile?.fullName.split(" ")[0]}
           </h1>
           <p className="mt-1.5 text-[15px] text-muted-foreground">
-            Here's your queue status, upcoming appointments, and care summary for today.
+            Track your live queue status, upcoming appointments, and care summary at a glance.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex flex-wrap gap-2.5 shrink-0">
           <Link
             to="/patient/appointments"
             search={{ book: "1" } as never}
@@ -162,30 +160,27 @@ function Dashboard() {
               Book appointment
             </Btn>
           </Link>
-          <Link
-            to="/patient/live-queue"
-          >
-            <Btn variant="secondary">
-              Live queue
-            </Btn>
+          <Link to="/patient/live-queue">
+            <Btn variant="secondary">Live queue</Btn>
           </Link>
         </div>
       </section>
 
       <AppointmentTokens />
+
       {mine && (
-        <>
+        <div className="mb-8">
           <PatientStatus />
           <QueueHero />
-        </>
+        </div>
       )}
 
-      <section className="mt-8 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <section aria-label="Quick actions" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
           {
             to: "/patient/appointments",
             title: "Appointments",
-            desc: "Schedule or view tokens",
+            desc: "Schedule or manage tokens",
             icon: Ticket,
             prefetch: "/patient/appointments",
           },
@@ -229,8 +224,8 @@ function Dashboard() {
         ))}
       </section>
 
-      <div className="mt-8 grid gap-6 md:grid-cols-3">
-        <div className="surface p-6 md:col-span-2">
+      <div className="mt-8 grid items-stretch gap-6 lg:grid-cols-[1.05fr_1fr]">
+        <section className="surface p-6">
           <h2 className="text-lg font-semibold tracking-tight">Before you arrive</h2>
           <ul className="mt-4 divide-y divide-border">
             {(
@@ -238,17 +233,17 @@ function Dashboard() {
                 [
                   BellRing,
                   "Arrive when 3 patients are ahead",
-                  "We'll notify you when it's almost your turn.",
+                  "We'll notify you via the bell menu when it's almost your turn.",
                 ],
                 [
                   Ticket,
                   "Show your token at reception",
-                  "Keep this page open or note your token number.",
+                  "Keep your appointment card or downloaded token PDF ready.",
                 ],
                 [
                   MapPin,
                   "Wait near the consultation area",
-                  "Tokens are called on the screen in the lobby.",
+                  "Tokens are called on the waiting room display screen in order.",
                 ],
               ] as const
             ).map(([Icon, t, d]) => (
@@ -263,52 +258,11 @@ function Dashboard() {
               </li>
             ))}
           </ul>
-          {mine && (
-            <div className="mt-6 flex flex-wrap gap-3 border-t border-border pt-5">
-              <Link to="/patient/live-queue">
-                <Btn>
-                  View live queue <ArrowRight className="size-4" />
-                </Btn>
-              </Link>
-              <Link to="/patient/get-token">
-                <Btn variant="secondary">Appointments</Btn>
-              </Link>
-              <Link to="/patient/history">
-                <Btn variant="secondary">Visit history</Btn>
-              </Link>
-            </div>
-          )}
-        </div>
-        <aside className="surface flex flex-col justify-between p-6">
-          <div>
-            <h2 className="text-lg font-semibold tracking-tight">Clinic</h2>
-            <div className="mt-4 space-y-3.5 text-sm">
-              <div className="font-semibold text-foreground">{clinic.name}</div>
-              <div className="flex gap-2.5 text-muted-foreground">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-primary" />
-                <span>{clinic.address || "Address on file"}</span>
-              </div>
-              <div className="flex gap-2.5 text-muted-foreground">
-                <Clock className="mt-0.5 size-4 shrink-0 text-primary" />
-                <span>
-                  Today · {formatTime(clinic.opening)} – {formatTime(clinic.closing)}
-                </span>
-              </div>
-              <div className="flex gap-2.5 text-muted-foreground">
-                <Phone className="mt-0.5 size-4 shrink-0 text-primary" />
-                <span>{clinic.phone || "Phone on file"}</span>
-              </div>
-            </div>
-          </div>
-          <div className="mt-5 border-t border-border pt-4">
-            <div className="inline-flex items-center gap-2 rounded-full bg-success-soft px-3 py-1 text-xs font-medium text-success">
-              <span className="size-1.5 rounded-full bg-current" />
-              {open ? "Queue open" : "Queue closed"}
-            </div>
-          </div>
-        </aside>
+        </section>
+
+        {/* Your Care Summary replaces the old standalone Clinic info card */}
+        <PatientSummary />
       </div>
-      <PatientSummary />
     </>
   );
 }

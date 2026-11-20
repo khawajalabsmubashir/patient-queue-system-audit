@@ -1,13 +1,13 @@
-import { TokenActions } from "@/components/appointment-tokens";
+import { AppointmentStatusBadge, TokenActions } from "@/components/appointment-tokens";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
-import { PageHeader, Btn } from "@/components/qc";
+import { PageHeader } from "@/components/qc";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
-
 import type { AppointmentContext } from "@/types/clinical-workflow";
+
 export const Route = createFileRoute("/patient/appointment/$appointmentId")({
   component: AppointmentDetail,
 });
+
 function AppointmentDetail() {
   const { appointmentId } = Route.useParams();
   const remote = useClinicalData<AppointmentContext>(
@@ -19,28 +19,25 @@ function AppointmentDetail() {
     <>
       <PageHeader
         title="Appointment details"
-        sub={`${a.clinicName} · ${a.scheduledAt.replace("T", " ")} · ${a.status}`}
+        sub={`${a.clinicName} · ${a.scheduledAt.replace("T", " ")}`}
+        right={<AppointmentStatusBadge status={a.status} />}
       />
       <section className="surface space-y-5 p-6">
         {a.token && (
           <div>
             <p className="text-xs text-muted-foreground">Appointment token</p>
             <p className="tabular mt-2 text-4xl font-semibold text-primary">{a.token.tokenCode}</p>
-            <TokenActions token={a.token} onChanged={remote.reload} />
+            <TokenActions token={a.token} appointmentStatus={a.status} onChanged={remote.reload} />
           </div>
         )}
         <div>
-          <h2>Reason for appointment</h2>
-          <p className="whitespace-pre-wrap break-words">{a.reason || "Not provided"}</p>
-        </div>
-        <div>
-          <h2>Your notes</h2>
-          <p className="whitespace-pre-wrap break-words">
-            {a.patientNotes || "No additional notes."}
+          <h2 className="text-sm font-semibold text-foreground">Notes</h2>
+          <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted-foreground">
+            {a.patientNotes || a.reason || "No additional notes."}
           </p>
         </div>
       </section>
-      <a className="mt-6 inline-block text-sm text-primary" href="/patient/appointments">
+      <a className="mt-6 inline-block text-sm text-primary hover:underline" href="/patient/appointments">
         Back to appointments
       </a>
     </>
