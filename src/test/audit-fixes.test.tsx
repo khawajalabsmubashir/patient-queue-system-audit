@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 
 beforeAll(() => {
@@ -18,7 +18,9 @@ beforeAll(() => {
 const mocks = vi.hoisted(() => ({
   api: vi.fn(),
   register: vi.fn(),
+  login: vi.fn(),
   logout: vi.fn(),
+  beginGoogleLogin: vi.fn(),
   navigate: vi.fn(),
   pathname: "/patient/appointments",
   role: "patient" as "patient" | "admin" | "nurse" | "receptionist",
@@ -30,8 +32,9 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/api/client", () => ({ api: mocks.api }));
 vi.mock("@/services/auth", () => ({
   register: mocks.register,
-  login: vi.fn(),
+  login: mocks.login,
   logout: mocks.logout,
+  beginGoogleLogin: mocks.beginGoogleLogin,
 }));
 vi.mock("@/providers/auth-provider", () => ({
   useAuth: () => ({
@@ -70,9 +73,13 @@ vi.mock("@/components/queue-feedback", () => ({
 vi.mock("@/components/notification-center", () => ({
   NotificationCenter: () => <div data-testid="notification-center" />,
 }));
-vi.mock("@/components/final-operations", () => ({
-  GlobalSearch: () => <div data-testid="global-search" />,
-}));
+vi.mock("@/components/final-operations", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/components/final-operations")>();
+  return {
+    ...actual,
+    GlobalSearch: () => <div data-testid="global-search" />,
+  };
+});
 vi.mock("@tanstack/react-router", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@tanstack/react-router")>();
   return {
@@ -111,6 +118,8 @@ import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { Register } from "@/routes/register";
 import { Route as LoginRoute } from "@/routes/login";
 import { PageHeader } from "@/components/qc";
+import { GoogleButton } from "@/components/google-button";
+import { AccountSettings } from "@/components/final-operations";
 import { Route as AdminRoute } from "@/routes/admin";
 import { Route as StaffRoute } from "@/routes/staff";
 import { Route as PatientRoute } from "@/routes/patient";
@@ -121,6 +130,8 @@ afterEach(() => {
   clearClinicalCache();
   mocks.api.mockReset();
   mocks.register.mockReset();
+  mocks.login.mockReset();
+  mocks.beginGoogleLogin.mockReset();
   mocks.logout.mockReset();
   mocks.navigate.mockReset();
   mocks.pathname = "/patient/appointments";
@@ -455,5 +466,91 @@ describe("Audit fixes verification", () => {
     expect(heading.className).toContain("break-words");
     expect(heading.className).toContain("[overflow-wrap:anywhere]");
     expect(heading.parentElement?.className).toContain("min-w-0");
+  });
+  it("Register empty email shows Email is required and Full name maxLength is 50", async () => {
+    expect(validatePersonName("A".repeat(51), "Full name").ok).toBe(false);
+    expect(validatePersonName("A".repeat(50), "Full name").ok).toBe(true);
+
+    render(<Register />);
+    const nameInput = screen.getByLabelText("Full name") as HTMLInputElement;
+    expect(nameInput.maxLength).toBe(50);
+    fireEvent.change(nameInput, { target: { value: "Valid Patient" } });
+    fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "03001234567" } });
+    fireEvent.change(screen.getByLabelText("Password"), { target: { value: "StrongPass123!" } });
+    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "StrongPass123!" } });
+    fireEvent.click(screen.getByRole("button", { name: /Create account/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Email is required.");
+    expect(mocks.register).not.toHaveBeenCalled();
+  });
+
+  it("BUG-09: Network failure produces user-friendly connection message without local API text", async () => {
+    const actualClient = await vi.importActual<typeof import("@/api/client")>("@/api/client");
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    try {
+      await expect(actualClient.api("/auth/login", { method: "POST", body: {} })).rejects.toThrow(
+        /Connection failed. Please check your internet connection and try again./i,
+      );
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("BUG-10: Account & security rejects reusing current password as new password", async () => {
+    mocks.api.mockResolvedValue({
+      profile: { fullName: "Patient User", email: "patient@example.com", role: "patient" },
+      googleLinked: false,
+      sessions: [{ expiresAt: Date.now() + 60000, current: true }],
+    });
+    render(<AccountSettings />);
+    fireEvent.change(await screen.findByLabelText("Current password"), {
+      target: { value: "SamePassword123!" },
+    });
+    fireEvent.change(screen.getByLabelText("New password"), {
+      target: { value: "SamePassword123!" },
+    });
+    fireEvent.change(screen.getByLabelText("Confirm new password"), {
+      target: { value: "SamePassword123!" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Change password" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "New password must be different from the current password.",
+    );
+    expect(mocks.api).not.toHaveBeenCalledWith("/account/password", expect.anything());
+  });
+
+  it("BUG-11 & BUG-12: Login submits via Enter key and keeps showing alert across 7 wrong attempts", async () => {
+    mocks.login.mockRejectedValue(new Error("The email or password is incorrect."));
+    const LoginComponent = LoginRoute.options.component!;
+    render(<LoginComponent />);
+    const emailInput = screen.getByLabelText("Email");
+    const passwordInput = screen.getByLabelText("Password");
+    fireEvent.change(emailInput, { target: { value: "patient@example.com" } });
+    fireEvent.change(passwordInput, { target: { value: "WrongPassword1" } });
+
+    // Submit form directly as triggered by pressing Enter inside password input
+    const form = passwordInput.closest("form")!;
+    fireEvent.submit(form);
+    expect(await screen.findByRole("alert")).toHaveTextContent("The email or password is incorrect.");
+    expect(mocks.login).toHaveBeenCalledTimes(1);
+
+    for (let i = 2; i <= 7; i++) {
+      fireEvent.click(screen.getByRole("button", { name: /Sign in/i }));
+      await waitFor(() => expect(mocks.login).toHaveBeenCalledTimes(i));
+      expect(await screen.findByRole("alert")).toHaveTextContent(/incorrect|locked|attempts/i);
+    }
+  });
+
+  it("BUG-13: Continue with Google resets loading state on pageshow back navigation", async () => {
+    mocks.beginGoogleLogin.mockReturnValue(new Promise(() => {}));
+    render(<GoogleButton />);
+    const btn = screen.getByRole("button", { name: /Continue with Google/i });
+    expect(btn).not.toBeDisabled();
+    fireEvent.click(btn);
+    expect(btn).toBeDisabled();
+
+    await act(async () => {
+      window.dispatchEvent(new Event("pageshow"));
+    });
+    await waitFor(() => expect(btn).not.toBeDisabled());
   });
 });

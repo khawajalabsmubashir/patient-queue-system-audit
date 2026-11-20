@@ -37,6 +37,15 @@ export function Register() {
       setError(nameCheck.error);
       return;
     }
+    const cleanEmail = rawEmail.trim();
+    if (!cleanEmail) {
+      setError("Email is required.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError("Enter a valid email address.");
+      return;
+    }
     const phoneCheck = validatePhoneNumber(rawPhone);
     if (!phoneCheck.ok) {
       setError(phoneCheck.error);
@@ -54,7 +63,7 @@ export function Register() {
     setError("");
     setLoading(true);
     try {
-      await register(nameCheck.value, rawEmail, phoneCheck.value, password);
+      await register(nameCheck.value, cleanEmail, phoneCheck.value, password);
       toast.success("Account created. Welcome to Neuro Spine Care Center.");
       await navigate({ to: "/patient/dashboard" });
     } catch (err) {
@@ -147,7 +156,7 @@ export function Register() {
                 {error}
               </p>
             )}
-            <Btn size="lg" className="w-full" disabled={loading}>
+            <Btn type="submit" size="lg" className="w-full" disabled={loading}>
               {loading ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />

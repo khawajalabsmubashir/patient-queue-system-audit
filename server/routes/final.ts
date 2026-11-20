@@ -550,6 +550,12 @@ export function finalRoutes(db: Database, notify: Notify) {
       u = user(res);
     if (!(await compare(c.currentPassword, u.password_hash)))
       throw new ApiError(400, "INVALID_PASSWORD", "Current password is incorrect.");
+    if (c.newPassword === c.currentPassword || (await compare(c.newPassword, u.password_hash)))
+      throw new ApiError(
+        400,
+        "SAME_PASSWORD",
+        "New password must be different from the current password.",
+      );
     const encoded = await hash(c.newPassword, 12);
     await atomic(db, async () => {
       const changed = (await db

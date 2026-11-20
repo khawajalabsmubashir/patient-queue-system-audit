@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Loader2 } from "lucide-react";
 import { Btn } from "@/components/qc";
 import { beginGoogleLogin } from "@/services/auth";
@@ -6,6 +6,22 @@ import { friendlyError } from "@/services/errors";
 export function GoogleButton() {
   const [busy, setBusy] = useState(false),
     [error, setError] = useState("");
+  useEffect(() => {
+    const reset = () => setBusy(false);
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") reset();
+    };
+    window.addEventListener("pageshow", reset);
+    window.addEventListener("popstate", reset);
+    window.addEventListener("focus", reset);
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => {
+      window.removeEventListener("pageshow", reset);
+      window.removeEventListener("popstate", reset);
+      window.removeEventListener("focus", reset);
+      document.removeEventListener("visibilitychange", onVisibility);
+    };
+  }, []);
   return (
     <div className="mt-5">
       <div className="mb-5 flex items-center gap-3 text-xs text-muted-foreground">

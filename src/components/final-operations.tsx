@@ -670,8 +670,10 @@ export function AccountSettings() {
       await api(path, { body, method });
       setMessage("Account security updated. Other sessions have been signed out.");
       remote.reload();
+      return true;
     } catch (e) {
       setError(friendlyError(e));
+      return false;
     } finally {
       setBusy(false);
     }
@@ -699,11 +701,17 @@ export function AccountSettings() {
           className="max-w-md space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
-            const f = new FormData(e.currentTarget);
+            const form = e.currentTarget;
+            const f = new FormData(form);
+            const currentPw = String(f.get("currentPassword") ?? "");
             const nextPw = String(f.get("newPassword") ?? "");
             const pwCheck = validatePassword(nextPw, 12);
             if (!pwCheck.ok) {
               setError(pwCheck.error);
+              return;
+            }
+            if (nextPw === currentPw) {
+              setError("New password must be different from the current password.");
               return;
             }
             if (nextPw !== String(f.get("confirm") ?? "")) {
@@ -712,10 +720,11 @@ export function AccountSettings() {
             }
             void action(
               "/account/password",
-              { currentPassword: f.get("currentPassword"), newPassword: f.get("newPassword") },
+              { currentPassword: currentPw, newPassword: nextPw },
               "PUT",
-            );
-            e.currentTarget.reset();
+            ).then((ok) => {
+              if (ok) form.reset();
+            });
           }}
         >
           <Field

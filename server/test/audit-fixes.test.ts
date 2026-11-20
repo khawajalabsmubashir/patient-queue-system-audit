@@ -54,6 +54,32 @@ test("audit fixes: backend validation rejects oversized/SQL/script inputs and >5
     });
     assert.equal(longNameRes.status, 400);
 
+    // Empty email error message + 50 char name cap
+    const emptyEmailRes = await req("/auth/register", "", {
+      fullName: "Valid Patient",
+      email: "",
+      phone: "03001234567",
+      password: "Password123!",
+    });
+    assert.equal(emptyEmailRes.status, 400);
+    assert.equal(emptyEmailRes.json.error.message, "Email is required.");
+
+    const over50Res = await req("/auth/register", "", {
+      fullName: "A".repeat(51),
+      email: "over50@example.com",
+      phone: "03001234567",
+      password: "Password123!",
+    });
+    assert.equal(over50Res.status, 400);
+
+    const exact50Res = await req("/auth/register", "", {
+      fullName: "A".repeat(50),
+      email: "exact50@example.com",
+      phone: "03001234567",
+      password: "Password123!",
+    });
+    assert.equal(exact50Res.status, 201);
+
     const longPhoneRes = await req("/auth/register", "", {
       fullName: "Valid Patient",
       email: "phone@example.com",
@@ -205,6 +231,25 @@ test("audit fixes: backend validation rejects oversized/SQL/script inputs and >5
       reason: "",
     });
     assert.equal(wrongClinicRes.status, 403);
+
+    // BUG-10: Reject reusing current password as new password
+    const samePwRes = await req("/account/password", okPatient.cookie, {
+      currentPassword: "Password123!",
+      newPassword: "Password123!",
+    }, "PUT");
+    assert.equal(samePwRes.status, 400);
+    assert.equal(samePwRes.json.error.message, "New password must be different from the current password.");
+
+    // BUG-11: Repeated wrong password attempts always return clear error & lock after 5 attempts
+    for (let attempt = 1; attempt <= 7; attempt++) {
+      const failLogin = await req("/auth/login", "", {
+        email: "valid-audit@example.com",
+        password: "WrongPassword999!",
+        portal: "patient",
+      });
+      assert.equal(failLogin.status, attempt >= 5 ? 429 : 401);
+      assert.ok(typeof failLogin.json.error.message === "string" && failLogin.json.error.message.length > 0);
+    }
   } finally {
     await app.close();
   }

@@ -39,10 +39,23 @@ function Login() {
   const [password, setPassword] = useState("");
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanEmail = email.trim();
+    if (!cleanEmail) {
+      setError("Email is required.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setError("Enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      setError("Password is required.");
+      return;
+    }
     setLoading(true);
-    setError("");
     try {
-      const profile = await login(email, password, role);
+      setError("");
+      const profile = await login(cleanEmail, password, role);
       await nav({
         to:
           profile.role === "admin"
@@ -108,7 +121,7 @@ function Login() {
             <button
               key={r}
               type="button"
-              onClick={() => setRole(r)}
+              onClick={() => { setRole(r); setError(""); }}
               className={cn(
                 "rounded-md py-2 font-medium capitalize transition",
                 role === r ? "bg-card shadow-soft" : "text-muted-foreground",
@@ -119,7 +132,7 @@ function Login() {
           ))}
           </div>
 
-          <form onSubmit={submit} className="mt-6 space-y-4">
+          <form onSubmit={submit} noValidate className="mt-6 space-y-4">
             <Field
               label="Email"
               type="email"
@@ -148,11 +161,11 @@ function Login() {
               </Link>
             </div>
             {error && (
-              <p role="alert" className="text-sm text-destructive">
+              <p role="alert" aria-live="assertive" className="text-sm text-destructive">
                 {error}
               </p>
             )}
-            <Btn size="lg" className="w-full" disabled={loading}>
+            <Btn type="submit" size="lg" className="w-full" disabled={loading}>
               {loading ? (
                 <Loader2 className="size-4 animate-spin" />
               ) : (

@@ -1,5 +1,7 @@
 import { Router } from "express";
 import { randomUUID } from "node:crypto";
+import { hashSync } from "bcryptjs";
+import { validatePersonName, validatePhoneNumber } from "../../src/domain/input-validation.ts";
 import { z } from "zod";
 import { atomic, one, many, type Database, type UserRow } from "../db/database.ts";
 import { ApiError, requireRole } from "../middleware/auth.ts";
@@ -27,6 +29,7 @@ import { appointments, createAppointment } from "../services/clinics.ts";
 import { profile, saveProfile, startVisit, recordSchema } from "../services/clinical.ts";
 import { clinicDayKey } from "../../src/domain/queue.js";
 import type { Notify } from "./queue.ts";
+const unusedWalkInHash = hashSync("unassigned-walkin-authentication", 10);
 export function operationsRoutes(
   db: Database,
   notify: Notify,
@@ -155,10 +158,74 @@ export function operationsRoutes(
     send(res, demographics);
   });
   r.post("/staff/appointments", requireRole(db), async (req, res) => {
-    const u = user(res);
-    await authorizeClinic(db, u, scope(req), ["receptionist"]);
-    await patientInClinic(db, u, idValue.parse(req.body.patientId), scope(req));
-    send(res, await createAppointment(db, scope(req), u.id, req.body), 201);
+    const u = user(res),
+      clinicId = scope(req);
+    await authorizeClinic(db, u, clinicId, ["receptionist"]);
+    const body = (req.body && typeof req.body === "object" ? req.body : {}) as Record<
+      string,
+      unknown
+    >;
+    let bookingBody: Record<string, unknown> = body;
+    if (body["walkIn"] && typeof body["walkIn"] === "object") {
+      const walkIn = z
+        .object({
+          fullName: z.string().superRefine((val, ctx) => {
+            const check = validatePersonName(val, "Full name");
+            if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+          }),
+          phone: z.string().superRefine((val, ctx) => {
+            const check = validatePhoneNumber(val);
+            if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+          }),
+          email: z.union([z.literal(""), z.string().trim().email().max(254)]).optional(),
+        })
+        .strict()
+        .parse(body["walkIn"]);
+      const cleanName = walkIn.fullName.trim().replace(/\s+/g, " ");
+      const cleanPhone = walkIn.phone.trim().replace(/\s+/g, " ");
+      const cleanEmail = walkIn.email?.trim().toLowerCase() || "";
+      const patientId = await atomic(db, async () => {
+        if (cleanEmail) {
+          const existing = await one<UserRow>(db, "SELECT * FROM users WHERE email=?", cleanEmail);
+          if (existing) {
+            const isStaff = await one(
+              db,
+              "SELECT user_id FROM staff_profiles WHERE user_id=?",
+              existing.id,
+            );
+            if (existing.role !== "patient" || isStaff)
+              throw new ApiError(
+                409,
+                "EMAIL_CONFLICT",
+                "That email belongs to a staff or admin account.",
+              );
+            return existing.id;
+          }
+        }
+        const pid = randomUUID(),
+          now = stamp(),
+          finalEmail = cleanEmail || `walkin-${pid}@walkin.queuecare.local`;
+        await db
+          .prepare("INSERT INTO users VALUES (?,?,?,?,?,?,?,?)")
+          .run(pid, cleanName, finalEmail, cleanPhone, unusedWalkInHash, "patient", now, now);
+        await db
+          .prepare("INSERT INTO patient_profiles(user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING")
+          .run(pid);
+        await audit(db, u.id, "patient.walkin_created", "patient", pid, clinicId);
+        return pid;
+      });
+      const { walkIn: _w, ...rest } = body;
+      bookingBody = { ...rest, patientId };
+    } else {
+      const pid = idValue.parse(body["patientId"]);
+      const existing = await one<{ id: string }>(
+        db,
+        "SELECT id FROM users u WHERE u.id=? AND u.role='patient' AND NOT EXISTS(SELECT 1 FROM staff_profiles sp WHERE sp.user_id=u.id)",
+        pid,
+      );
+      if (!existing) throw new ApiError(404, "PATIENT_NOT_FOUND", "Patient not found.");
+    }
+    send(res, await createAppointment(db, clinicId, u.id, bookingBody), 201);
   });
   r.post("/staff/check-in", requireRole(db), async (req, res) => {
     const c = z

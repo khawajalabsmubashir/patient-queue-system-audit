@@ -11,8 +11,17 @@ import { ClinicalLoading, useClinicalData } from "@/components/clinical";
 import { Btn, Field, PageHeader } from "@/components/qc";
 import { PatientPicker } from "@/components/patient-picker";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
+import {
+  MAX_FULL_NAME_LENGTH,
+  MAX_PHONE_LENGTH,
+  validatePersonName,
+  validatePhoneNumber,
+} from "@/domain/input-validation";
 import { friendlyError } from "@/services/errors";
 import type { Appointment } from "@/types/local";
+
+type BookingPatientMode = "existing" | "lookup" | "walkin";
+
 export function AppointmentCalendar() {
   const { selected } = useClinicContext(),
     { profile } = useAuth(),
@@ -33,17 +42,24 @@ export function AppointmentCalendar() {
     [status, setStatus] = useState(""),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
-    [edit, setEdit] = useState<Appointment | "new" | null>(null);
+    [edit, setEdit] = useState<Appointment | "new" | null>(null),
+    [patientMode, setPatientMode] = useState<BookingPatientMode>("existing"),
+    [lookupEmail, setLookupEmail] = useState(""),
+    [lookupBusy, setLookupBusy] = useState(false),
+    [lookupPatient, setLookupPatient] = useState<{ id: string; name: string } | null>(null),
+    [walkInName, setWalkInName] = useState(""),
+    [walkInPhone, setWalkInPhone] = useState(""),
+    [walkInEmail, setWalkInEmail] = useState("");
   const target =
     typeof window === "undefined"
       ? null
       : new URLSearchParams(window.location.search).get("appointmentId");
-      const receptionist = profile?.role === "receptionist",
-      remote = useClinicalData<FlowAppointment[]>(
-        (receptionist ? "/staff/appointment-flow?clinicId=" : "/admin/appointment-flow?clinicId=") +
-          encodeURIComponent(selected),
-      ),
-      admin = profile?.role === "admin";
+  const receptionist = profile?.role === "receptionist",
+    remote = useClinicalData<FlowAppointment[]>(
+      (receptionist ? "/staff/appointment-flow?clinicId=" : "/admin/appointment-flow?clinicId=") +
+        encodeURIComponent(selected),
+    ),
+    admin = profile?.role === "admin";
   useEffect(() => {
     const fn = () => remote.reload();
     window.addEventListener("queuecare:updated", fn);
@@ -55,7 +71,20 @@ export function AppointmentCalendar() {
       window.clearInterval(timer);
     };
   }, [selected]);
-  useEffect(() => setEdit(null), [selected]);
+  function resetBookingState() {
+    setError("");
+    setPatientMode("existing");
+    setLookupEmail("");
+    setLookupPatient(null);
+    setLookupBusy(false);
+    setWalkInName("");
+    setWalkInPhone("");
+    setWalkInEmail("");
+  }
+  useEffect(() => {
+    setEdit(null);
+    resetBookingState();
+  }, [selected]);
   useEffect(() => {
     const found = remote.data?.find((a) => a.id === target);
     if (found) {
@@ -92,14 +121,46 @@ export function AppointmentCalendar() {
       setBusy(false);
     }
   }
+  async function findPatientByEmail() {
+    const email = lookupEmail.trim();
+    if (!email) {
+      setError("Enter the patient's email address to search.");
+      return;
+    }
+    setLookupBusy(true);
+    setError("");
+    try {
+      const found = await api<{ id: string; name: string }>(
+        "/staff/patient-lookup?clinicId=" +
+          encodeURIComponent(selected) +
+          "&email=" +
+          encodeURIComponent(email),
+      );
+      setLookupPatient(found);
+    } catch (e) {
+      setLookupPatient(null);
+      setError(friendlyError(e));
+    } finally {
+      setLookupBusy(false);
+    }
+  }
   return (
     <>
       <PageHeader
         title="Appointments"
         sub="Today → patient → consultation."
-        right={!receptionist && selected !== "all" && (
-          <Btn onClick={() => setEdit("new")}>Add appointment</Btn>
-        )}
+        right={
+          selected !== "all" && (
+            <Btn
+              onClick={() => {
+                resetBookingState();
+                setEdit("new");
+              }}
+            >
+              {receptionist ? "Book appointment" : "Add appointment"}
+            </Btn>
+          )
+        }
       />
       <div className="mb-5 flex flex-wrap items-center gap-3">
         {[
@@ -166,7 +227,10 @@ export function AppointmentCalendar() {
           <AppointmentRows
             items={filtered ?? []}
             onChanged={remote.reload}
-            {...(!receptionist ? { onOpen: setEdit } : {})}
+            onOpen={(a) => {
+              resetBookingState();
+              setEdit(a);
+            }}
             readOnly={receptionist}
           />
           {!filtered?.length && (
@@ -186,9 +250,12 @@ export function AppointmentCalendar() {
         </div>
       )}
       <Dialog
-        open={!receptionist && !!edit}
+        open={!!edit}
         onOpenChange={(o) => {
-          if (!o) setEdit(null);
+          if (!o) {
+            setEdit(null);
+            resetBookingState();
+          }
         }}
       >
         <DialogContent className="max-h-[90dvh] overflow-y-auto">
@@ -199,7 +266,9 @@ export function AppointmentCalendar() {
           <DialogDescription>
             {edit && edit !== "new"
               ? edit.patientName + " · " + edit.clinicName
-              : "Select an existing patient for this clinic."}
+              : receptionist
+                ? "Select an existing patient, look up a registered patient by email, or register a walk-in patient."
+                : "Select an existing patient for this clinic."}
           </DialogDescription>
           {error && (
             <p role="alert" className="text-sm text-destructive">
@@ -220,6 +289,51 @@ export function AppointmentCalendar() {
                   void action(edit, "scheduled", time);
                   return;
                 }
+                const reason = String(f.get("reason") ?? "");
+                let body: Record<string, unknown>;
+                if (receptionist && patientMode === "walkin") {
+                  const nameCheck = validatePersonName(walkInName, "Patient full name");
+                  if (!nameCheck.ok) {
+                    setError(nameCheck.error);
+                    return;
+                  }
+                  const phoneCheck = validatePhoneNumber(walkInPhone);
+                  if (!phoneCheck.ok) {
+                    setError(phoneCheck.error);
+                    return;
+                  }
+                  const cleanEmail = walkInEmail.trim();
+                  body = {
+                    walkIn: {
+                      fullName: nameCheck.value,
+                      phone: phoneCheck.value,
+                      ...(cleanEmail ? { email: cleanEmail } : {}),
+                    },
+                    scheduledAt: time,
+                    reason,
+                  };
+                } else if (receptionist && patientMode === "lookup") {
+                  if (!lookupPatient?.id) {
+                    setError("Search and select a registered patient by email first.");
+                    return;
+                  }
+                  body = {
+                    patientId: lookupPatient.id,
+                    scheduledAt: time,
+                    reason,
+                  };
+                } else {
+                  const patientId = String(f.get("patientId") ?? "");
+                  if (!patientId) {
+                    setError("Choose a patient before booking.");
+                    return;
+                  }
+                  body = {
+                    patientId,
+                    scheduledAt: time,
+                    reason,
+                  };
+                }
                 setBusy(true);
                 setError("");
                 void api(
@@ -228,22 +342,109 @@ export function AppointmentCalendar() {
                     encodeURIComponent(selected),
                   {
                     method: "POST",
-                    body: {
-                      patientId: String(f.get("patientId")),
-                      scheduledAt: time,
-                      reason: String(f.get("reason") ?? ""),
-                    },
+                    body,
                   },
                 )
                   .then(() => {
                     setEdit(null);
+                    resetBookingState();
                     remote.reload();
+                    window.dispatchEvent(new Event("queuecare:refresh"));
+                    window.dispatchEvent(new Event("queuecare:updated"));
                   })
                   .catch((e) => setError(friendlyError(e)))
                   .finally(() => setBusy(false));
               }}
             >
-              {edit === "new" && <PatientPicker />}
+              {edit === "new" &&
+                (receptionist ? (
+                  <div className="space-y-3">
+                    <div
+                      role="group"
+                      aria-label="Patient booking type"
+                      className="flex flex-wrap gap-2"
+                    >
+                      {(
+                        [
+                          ["existing", "Existing patient"],
+                          ["lookup", "Find by email"],
+                          ["walkin", "New walk-in"],
+                        ] as const
+                      ).map(([mode, label]) => (
+                        <Btn
+                          key={mode}
+                          type="button"
+                          variant={patientMode === mode ? "secondary" : "ghost"}
+                          onClick={() => {
+                            setPatientMode(mode);
+                            setError("");
+                          }}
+                        >
+                          {label}
+                        </Btn>
+                      ))}
+                    </div>
+                    {patientMode === "existing" && <PatientPicker />}
+                    {patientMode === "lookup" && (
+                      <div className="space-y-3 rounded-lg border border-border p-3">
+                        <div className="flex flex-wrap items-end gap-2">
+                          <div className="min-w-[200px] flex-1">
+                            <Field
+                              label="Registered patient email"
+                              type="email"
+                              value={lookupEmail}
+                              onChange={(e) => setLookupEmail(e.target.value)}
+                              placeholder="patient@example.com"
+                            />
+                          </div>
+                          <Btn
+                            type="button"
+                            variant="secondary"
+                            disabled={lookupBusy || !lookupEmail.trim()}
+                            onClick={() => void findPatientByEmail()}
+                          >
+                            {lookupBusy ? "Searching…" : "Find patient"}
+                          </Btn>
+                        </div>
+                        {lookupPatient && (
+                          <p className="text-sm font-medium text-foreground">
+                            Selected patient: {lookupPatient.name}
+                          </p>
+                        )}
+                      </div>
+                    )}
+                    {patientMode === "walkin" && (
+                      <div className="space-y-3 rounded-lg border border-border p-3">
+                        <Field
+                          label="Patient full name"
+                          name="walkInName"
+                          value={walkInName}
+                          maxLength={MAX_FULL_NAME_LENGTH}
+                          required
+                          onChange={(e) => setWalkInName(e.target.value)}
+                        />
+                        <Field
+                          label="Phone number"
+                          name="walkInPhone"
+                          value={walkInPhone}
+                          maxLength={MAX_PHONE_LENGTH}
+                          required
+                          onChange={(e) => setWalkInPhone(e.target.value)}
+                        />
+                        <Field
+                          label="Email (optional)"
+                          name="walkInEmail"
+                          type="email"
+                          value={walkInEmail}
+                          maxLength={254}
+                          onChange={(e) => setWalkInEmail(e.target.value)}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <PatientPicker />
+                ))}
               <AppointmentSlotPicker
                 clinicId={edit && edit !== "new" ? edit.clinicId : selected}
                 exclude={edit && edit !== "new" ? edit.id : undefined}

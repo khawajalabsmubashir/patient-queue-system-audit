@@ -1,4 +1,4 @@
-export const MAX_FULL_NAME_LENGTH = 80;
+export const MAX_FULL_NAME_LENGTH = 50;
 export const MIN_FULL_NAME_LENGTH = 3;
 export const MAX_PHONE_LENGTH = 20;
 export const MIN_PHONE_DIGITS = 7;
