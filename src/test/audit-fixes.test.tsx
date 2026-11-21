@@ -142,6 +142,7 @@ import { Route as AdminRoute } from "@/routes/admin";
 import { Route as StaffRoute } from "@/routes/staff";
 import { Route as PatientRoute } from "@/routes/patient";
 import { validatePassword, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
+import { formatDateOnly, formatDateTime } from "@/domain/date-format";
 
 afterEach(() => {
   cleanup();
@@ -672,5 +673,155 @@ describe("Audit fixes verification", () => {
     fireEvent.click(cancelledTab);
     expect(screen.getByText(/HP-009/)).toBeVisible();
     expect(screen.queryByText(/HP-010/)).toBeNull();
+  });
+
+  it("BUG-14, BUG-15 & BUG-18: Booking modal has uniform border radius, ignores outside clicks, warns on unsaved close & contains date picker inside dialog", async () => {
+    mocks.api.mockImplementation((path: string) => {
+      if (path.includes("/patient/profile")) {
+        return Promise.resolve({
+          id: "p1",
+          fullName: "Ali Khan",
+          phone: "03001234567",
+          dateOfBirth: "1995-05-05",
+          gender: "male",
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<Appointments />);
+    fireEvent.click(await screen.findByRole("button", { name: "Book appointment" }));
+    const dialog = await screen.findByRole("dialog");
+
+    // BUG-14: Uniform rounded-xl + overflow-hidden so scrollbars never square off corners
+    expect(dialog.className).toContain("rounded-xl");
+    expect(dialog.className).toContain("overflow-hidden");
+
+    // BUG-18: Opening date picker inside the dialog mounts its popover inside the dialog element
+    const dobPickerBtn = within(dialog).getByRole("button", { name: "Choose date" });
+    fireEvent.click(dobPickerBtn);
+    const grid = await within(dialog).findByRole("grid");
+    expect(dialog.contains(grid)).toBe(true);
+    fireEvent.keyDown(grid, { key: "Escape" });
+
+    // BUG-15: Clicking outside on overlay does NOT close the modal; Cancel with unsaved notes asks confirmation
+    fireEvent.change(within(dialog).getByLabelText("Patient notes (optional)"), {
+      target: { value: "Follow-up MRI notes" },
+    });
+    const overlay = document.querySelector("[data-radix-dialog-overlay], .fixed.inset-0.z-50");
+    if (overlay) {
+      fireEvent.pointerDown(overlay);
+      fireEvent.click(overlay);
+    }
+    expect(screen.getByRole("dialog")).toBeVisible();
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(await within(dialog).findByText(/Discard unsaved appointment details/i)).toBeVisible();
+    fireEvent.click(within(dialog).getByRole("button", { name: /Discard & close/i }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("BUG-22, BUG-23 & BUG-26: Sorts upcoming appointments ascending before cancelled, scopes to selected clinic & formats dates consistently", async () => {
+    mocks.api.mockImplementation((path: string) => {
+      if (path.includes("/patient/appointments")) {
+        return Promise.resolve([
+          // Unsorted order: cancelled first, later date (20 Nov) before earlier date (18 Nov), plus another clinic
+          {
+            id: "appt-cancelled",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            scheduledAt: "2030-11-21T09:00",
+            status: "cancelled",
+            token: { id: "tok-c", tokenCode: "HP-003", status: "cancelled" },
+          },
+          {
+            id: "appt-other-clinic",
+            clinicId: "northstar",
+            clinicName: "Northstar Medical Clinic",
+            scheduledAt: "2030-11-17T09:00",
+            status: "scheduled",
+            token: { id: "tok-other", tokenCode: "NM-001", status: "waiting" },
+          },
+          {
+            id: "appt-later",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            scheduledAt: "2030-11-20T14:15",
+            status: "scheduled",
+            token: { id: "tok-20", tokenCode: "HP-001", status: "waiting" },
+          },
+          {
+            id: "appt-nearest",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            scheduledAt: "2030-11-18T10:30",
+            status: "scheduled",
+            token: { id: "tok-18", tokenCode: "HP-002", status: "waiting" },
+          },
+        ]);
+      }
+      if (path.includes("/patient/summary")) {
+        return Promise.resolve({
+          appointment: {
+            clinic_id: "northstar",
+            scheduled_at: "2030-11-17T09:00",
+            clinic_name: "Northstar Medical Clinic",
+          },
+          appointments: [
+            {
+              id: "appt-other-clinic",
+              clinic_id: "northstar",
+              scheduled_at: "2030-11-17T09:00",
+              clinic_name: "Northstar Medical Clinic",
+              status: "scheduled",
+            },
+            {
+              id: "appt-nearest",
+              clinic_id: "clinic",
+              scheduled_at: "2030-11-18T10:30",
+              clinic_name: "Health Point",
+              status: "scheduled",
+            },
+            {
+              id: "appt-later",
+              clinic_id: "clinic",
+              scheduled_at: "2030-11-20T14:15",
+              clinic_name: "Health Point",
+              status: "scheduled",
+            },
+          ],
+          visit: null,
+          prescription: null,
+          document: null,
+          bills: { balance: 0 },
+          followups: [],
+          notifications: [],
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    expect(formatDateOnly("2030-11-18")).toBe("18 Nov 2030");
+    expect(formatDateTime("2030-11-18T10:30")).toBe("18 Nov 2030, 10:30 AM");
+
+    const { container } = render(<AppointmentTokens />);
+    expect(await screen.findByText("HP-002")).toBeVisible();
+    expect(screen.getByText("18 Nov 2030, 10:30 AM")).toBeVisible();
+    expect(screen.getByText("20 Nov 2030, 2:15 PM")).toBeVisible();
+
+    // BUG-23: Selected clinic is "clinic" (Health Point); Northstar clinic card must not leak onto Health Point dashboard
+    expect(screen.queryByText("Northstar Medical Clinic")).toBeNull();
+    expect(screen.queryByText("NM-001")).toBeNull();
+
+    // BUG-22: 18 Nov (HP-002) renders BEFORE 20 Nov (HP-001), and cancelled (HP-003) renders separately after active cards
+    const fullText = container.textContent ?? "";
+    expect(fullText.indexOf("HP-002")).toBeLessThan(fullText.indexOf("HP-001"));
+    expect(fullText.indexOf("HP-001")).toBeLessThan(fullText.indexOf("HP-003"));
+    cleanup();
+
+    // BUG-22 & BUG-23 in Care Summary: picks nearest appointment for Health Point (18 Nov), ignoring Northstar (17 Nov)
+    render(<PatientSummary />);
+    expect(await screen.findByText(/18 Nov 2030, 10:30 AM · Health Point/)).toBeVisible();
+    expect(screen.queryByText(/Northstar Medical Clinic/)).toBeNull();
   });
 });

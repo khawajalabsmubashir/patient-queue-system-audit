@@ -240,6 +240,18 @@ test("audit fixes: backend validation rejects oversized/SQL/script inputs and >5
     assert.equal(samePwRes.status, 400);
     assert.equal(samePwRes.json.error.message, "New password must be different from the current password.");
 
+    // BUG-22 & BUG-23: /patient/appointments & /patient/summary return nearest upcoming appointments in ascending order with clinic_id
+    const listApptsRes = await req("/patient/appointments", okPatient.cookie);
+    assert.equal(listApptsRes.status, 200);
+    const listAppts = listApptsRes.json.data as Array<{ status: string; scheduledAt: string }>;
+    const activeUpcoming = listAppts.filter((a) => ["scheduled", "confirmed", "checked_in"].includes(a.status));
+    for (let i = 1; i < activeUpcoming.length; i++) {
+      assert.ok(activeUpcoming[i - 1]!.scheduledAt <= activeUpcoming[i]!.scheduledAt);
+    }
+    const summaryRes = await req("/patient/summary", okPatient.cookie);
+    assert.equal(summaryRes.status, 200);
+    assert.ok(Array.isArray(summaryRes.json.data.appointments));
+
     // BUG-11: Repeated wrong password attempts always return clear error & lock after 5 attempts
     for (let attempt = 1; attempt <= 7; attempt++) {
       const failLogin = await req("/auth/login", "", {

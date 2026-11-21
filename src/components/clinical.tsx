@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate, Link } from "@tanstack/react-router";
 import { api } from "@/api/client";
 import { Btn, PageHeader } from "@/components/qc";
+import { formatDateOnly } from "@/domain/date-format";
 import { friendlyError } from "@/services/errors";
 import type { ClinicalVisit, PatientVisit } from "@/types/clinical";
 type CacheEntry = { data: unknown; fetchedAt: number; stale: boolean };
@@ -219,7 +220,7 @@ export function VisitTimeline({
             <div className="flex flex-wrap justify-between gap-2">
               <p className="font-medium">{v.clinicName}</p>
               <span className="text-xs text-muted-foreground">
-                {new Date(v.visitAt).toLocaleDateString("en-GB", { timeZone: "Asia/Karachi" })} ·{" "}
+                {formatDateOnly(v.visitAt)} ·{" "}
                 {v.status === "completed" ? "Completed" : "In progress"}
               </span>
             </div>
@@ -234,7 +235,7 @@ export function VisitTimeline({
               <span>
                 {v.prescription.items.length ? "Prescription available" : "No prescription"}
               </span>
-              {v.followUpDate && <span>Follow-up: {v.followUpDate}</span>}
+              {v.followUpDate && <span>Follow-up: {formatDateOnly(v.followUpDate)}</span>}
             </div>
           </Link>
         ))
@@ -270,10 +271,7 @@ export function PrescriptionView({
           <p className="font-medium">Prescription</p>
           <p>{visit.doctorName}</p>
           <p>
-            {new Date(visit.prescription.prescribedAt ?? visit.visitAt).toLocaleDateString(
-              "en-GB",
-              { timeZone: "Asia/Karachi" },
-            )}
+            {formatDateOnly(visit.prescription.prescribedAt ?? visit.visitAt)}
           </p>
         </div>
       </div>
@@ -339,7 +337,7 @@ export function PatientVisitView({
         <div className="print:hidden">
           <PageHeader
             title={prescriptionOnly ? "Prescription" : "Visit details"}
-            sub={`${visit.clinicName} · ${new Date(visit.visitAt).toLocaleDateString("en-GB", { timeZone: "Asia/Karachi" })}`}
+            sub={`${visit.clinicName} · ${formatDateOnly(visit.visitAt)}`}
             right={
               prescriptionOnly ? (
                 <PrescriptionPreview visit={visit} />
@@ -356,7 +354,7 @@ export function PatientVisitView({
             <PrintBranding clinicId={visit.clinicId} />
             <p className="text-sm">
               {visit.patientName} · {visit.clinicName} ·{" "}
-              {new Date(visit.visitAt).toLocaleDateString()}
+              {formatDateOnly(visit.visitAt)}
             </p>
             {[
               ["Visit summary", visit.patientSummary],

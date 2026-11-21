@@ -453,23 +453,27 @@ export function finalRoutes(db: Database, notify: Notify) {
         )) ?? {},
     }),
   );
-  r.get("/patient/summary", requireRole(db, "patient"), async (_req, res) => {
+  r.get("/patient/summary", requireRole(db, "patient"), async (req, res) => {
     const id = user(res).id;
+    const clinicFilter = scope(req.query);
     const [appts, visits, rx, docs, bills, notes, followups] = await Promise.all([
       many(
         db,
-        "SELECT a.id,a.scheduled_at,c.name clinic_name FROM appointments a JOIN clinics c ON c.id=a.clinic_id WHERE a.patient_id=? AND a.status='scheduled' AND substr(a.scheduled_at,1,10)>=? ORDER BY a.scheduled_at LIMIT 1",
+        "SELECT a.id,a.clinic_id,a.scheduled_at,CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END status,c.name clinic_name FROM appointments a JOIN clinics c ON c.id=a.clinic_id LEFT JOIN appointment_workflow w ON w.appointment_id=a.id WHERE a.patient_id=? AND (CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END) IN ('scheduled','confirmed','checked_in') AND substr(a.scheduled_at,1,10)>=?" +
+          (clinicFilter ? " AND a.clinic_id=?" : "") +
+          " ORDER BY a.scheduled_at ASC LIMIT 50",
         id,
         clinicDayKey(),
+        ...(clinicFilter ? [clinicFilter] : []),
       ),
-      many(
+      many<{ id: string; clinic_id: string; visit_at: string; clinic_name: string }>(
         db,
-        "SELECT e.id,e.visit_at,c.name clinic_name FROM encounters e JOIN clinics c ON c.id=e.clinic_id WHERE e.patient_id=? AND e.status='completed' ORDER BY e.visit_at DESC LIMIT 1",
+        "SELECT e.id,e.clinic_id,e.visit_at,c.name clinic_name FROM encounters e JOIN clinics c ON c.id=e.clinic_id WHERE e.patient_id=? AND e.status='completed' ORDER BY e.visit_at DESC LIMIT 10",
         id,
       ),
-      many(
+      many<{ id: string; visit_id: string; clinic_id: string; prescribed_at: string }>(
         db,
-        "SELECT p.id,e.id visit_id,p.prescribed_at FROM prescriptions p JOIN encounters e ON e.id=p.encounter_id WHERE e.patient_id=? AND e.status='completed' ORDER BY p.prescribed_at DESC LIMIT 1",
+        "SELECT p.id,e.id visit_id,e.clinic_id,p.prescribed_at FROM prescriptions p JOIN encounters e ON e.id=p.encounter_id WHERE e.patient_id=? AND e.status='completed' ORDER BY p.prescribed_at DESC LIMIT 10",
         id,
       ),
       many(
@@ -493,12 +497,15 @@ export function finalRoutes(db: Database, notify: Notify) {
       success: true,
       data: {
         appointment: appts[0] ?? null,
-        visit: visits[0] ?? null,
-        prescription: rx[0] ?? null,
+        appointments: appts,
+        visit: (clinicFilter ? visits.find((v) => v["clinic_id"] === clinicFilter) : visits[0]) ?? visits[0] ?? null,
+        visits,
+        prescription: (clinicFilter ? rx.find((p) => p["clinic_id"] === clinicFilter) : rx[0]) ?? rx[0] ?? null,
+        prescriptions: rx,
         document: docs[0] ?? null,
         bills,
         notifications: notes,
-        followups: followups.filter((x) => x.status !== "completed"),
+        followups: followups.filter((x) => x.status !== "completed" && (!clinicFilter || x["clinic_id"] === clinicFilter)),
       },
     });
   });

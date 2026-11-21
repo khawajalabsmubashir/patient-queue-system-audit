@@ -10,7 +10,7 @@ import { ClinicLocationPicker } from "@/components/clinic-location-picker";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Btn } from "@/components/qc";
 import { useState } from "react";
-import { appointmentTimeLabel } from "@/lib/appointment-time";
+import { formatDateOnly, formatDateTime, sortPatientAppointments } from "@/domain/date-format";
 import { AppointmentSlotPicker } from "@/components/appointment-slot-picker";
 import { useClinicContext } from "@/providers/clinic-provider";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -49,8 +49,11 @@ export function Appointments() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "completed" | "cancelled">("all");
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
   const [refresh, setRefresh] = useState(0);
-  const filteredAppointments = (remote.data ?? []).filter((a) => {
+  const hasUnsavedBooking = Boolean(review || notes.trim() || files.length > 0);
+  const sortedAppointments = sortPatientAppointments(remote.data ?? []);
+  const filteredAppointments = sortedAppointments.filter((a) => {
     if (statusFilter === "upcoming")
       return !["cancelled", "completed", "no_show"].includes(a.status);
     if (statusFilter === "completed") return a.status === "completed";
@@ -69,6 +72,7 @@ export function Appointments() {
             setNotes("");
             setFiles([]);
             setConfirmed(null);
+            setConfirmDiscard(false);
           }}
         >
           Book appointment
@@ -108,7 +112,7 @@ export function Appointments() {
       {confirmed && (
         <section className="surface mb-5 p-6" role="status">
           <h2 className="font-semibold">Appointment confirmed</h2>
-          <p className="mt-2 text-sm">{confirmed.scheduledAt.replace("T", " ")}</p>
+          <p className="tabular-nums mt-2 text-sm">{formatDateTime(confirmed.scheduledAt)}</p>
           <p className="tabular mt-3 text-4xl font-semibold text-primary">
             {confirmed.token.tokenCode}
           </p>
@@ -154,7 +158,7 @@ export function Appointments() {
                 <AppointmentStatusBadge status={a.status} />
               </div>
               <p className="tabular-nums mt-1 text-sm text-muted-foreground">
-                {a.scheduledAt.slice(0, 10)} {appointmentTimeLabel(a.scheduledAt.slice(11))}
+                {formatDateTime(a.scheduledAt)}
               </p>
               {a.reason && <p className="mt-1 text-sm">{a.reason}</p>}
               {a.token && (
@@ -180,12 +184,68 @@ export function Appointments() {
       <Dialog
         open={booking}
         onOpenChange={(open) => {
-          if (!busy) setBooking(open);
+          if (busy) return;
+          if (!open && hasUnsavedBooking) {
+            setConfirmDiscard(true);
+            return;
+          }
+          setConfirmDiscard(false);
+          setBooking(open);
         }}
       >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto">
+        <DialogContent
+          className="max-h-[90dvh] rounded-xl"
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onInteractOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => {
+            if (busy) {
+              e.preventDefault();
+              return;
+            }
+            if (hasUnsavedBooking) {
+              e.preventDefault();
+              setConfirmDiscard(true);
+            }
+          }}
+        >
           <DialogTitle>Book appointment</DialogTitle>
           <DialogDescription>Choose a clinic, date and available time.</DialogDescription>
+          {confirmDiscard && (
+            <div
+              role="alert"
+              className="rounded-lg border border-warning/40 bg-warning-soft/50 p-3 text-sm"
+            >
+              <p className="font-medium text-foreground">
+                Discard unsaved appointment details?
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Your entered notes, attachments, or review selection will be lost.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Btn
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setConfirmDiscard(false)}
+                >
+                  Keep editing
+                </Btn>
+                <Btn
+                  type="button"
+                  variant="danger"
+                  onClick={() => {
+                    setConfirmDiscard(false);
+                    setReview(null);
+                    setNotes("");
+                    setFiles([]);
+                    setError("");
+                    setBooking(false);
+                  }}
+                >
+                  Discard &amp; close
+                </Btn>
+              </div>
+            </div>
+          )}
           <form
             className="space-y-4"
             onSubmit={(e) => {
@@ -290,10 +350,11 @@ export function Appointments() {
                 <p className="break-words [overflow-wrap:anywhere] font-medium">Patient: {review.fullName}</p>
                 <p>
                   {clinics.find((c) => c.id === clinicId)?.name} ·{" "}
-                  {review.scheduledAt.replace("T", " ")}
+                  {formatDateTime(review.scheduledAt)}
                 </p>
                 <p>
-                  Gender: {review.gender.replaceAll("_", " ")} · Date of birth: {review.dateOfBirth}
+                  Gender: {review.gender.replaceAll("_", " ")} · Date of birth:{" "}
+                  {formatDateOnly(review.dateOfBirth)}
                 </p>
                 {notes && <p className="whitespace-pre-wrap break-words">{notes}</p>}
                 <Btn
@@ -311,9 +372,22 @@ export function Appointments() {
                 {error}
               </p>
             )}
-            <Btn disabled={busy || !clinicId || !patient.data}>
-              {busy ? "Booking…" : review ? "Confirm booking" : "Review booking"}
-            </Btn>
+            <div className="flex flex-wrap items-center gap-2 pt-1">
+              <Btn disabled={busy || !clinicId || !patient.data}>
+                {busy ? "Booking…" : review ? "Confirm booking" : "Review booking"}
+              </Btn>
+              <Btn
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => {
+                  if (hasUnsavedBooking) setConfirmDiscard(true);
+                  else setBooking(false);
+                }}
+              >
+                Cancel
+              </Btn>
+            </div>
           </form>
         </DialogContent>
       </Dialog>

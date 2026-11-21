@@ -1,6 +1,7 @@
 import { AppointmentStatusBadge, TokenActions } from "@/components/appointment-tokens";
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/qc";
+import { formatDateTime } from "@/domain/date-format";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
 import type { AppointmentContext } from "@/types/clinical-workflow";
 
@@ -19,7 +20,7 @@ function AppointmentDetail() {
     <>
       <PageHeader
         title="Appointment details"
-        sub={`${a.clinicName} · ${a.scheduledAt.replace("T", " ")}`}
+        sub={`${a.clinicName} · ${formatDateTime(a.scheduledAt)}`}
         right={<AppointmentStatusBadge status={a.status} />}
       />
       <section className="surface space-y-5 p-6">

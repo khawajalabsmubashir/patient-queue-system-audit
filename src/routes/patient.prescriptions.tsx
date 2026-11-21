@@ -1,3 +1,4 @@
+import { formatDateOnly } from "@/domain/date-format";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { PageHeader } from "@/components/qc";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
@@ -20,7 +21,7 @@ function Prescriptions() {
             >
               <p className="font-medium">{v.clinicName}</p>
               <p className="mt-2 text-sm text-muted-foreground">
-                {new Date(v.visitAt).toLocaleDateString("en-GB", { timeZone: "Asia/Karachi" })} ·{" "}
+                {formatDateOnly(v.visitAt)} ·{" "}
                 {v.doctorName} · {v.prescription.items.length} medicine(s)
               </p>
             </Link>

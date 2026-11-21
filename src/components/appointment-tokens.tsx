@@ -6,7 +6,7 @@ import { api } from "@/api/client";
 import { friendlyError } from "@/services/errors";
 import { useClinicContext } from "@/providers/clinic-provider";
 import { clinicDayKey } from "@/utils/clinic-date";
-import { appointmentTimeLabel } from "@/lib/appointment-time";
+import { formatDateOnly, formatDateTime, isUpcomingActiveAppointment, sortPatientAppointments } from "@/domain/date-format";
 import type { Appointment } from "@/types/local";
 
 const STATUS_BADGE_MAP: Record<string, { label: string; cls: string }> = {
@@ -116,7 +116,7 @@ export function TokenActions({
 
 export function AppointmentTokens() {
   const remote = useClinicalData<Appointment[]>("/patient/appointments");
-  const { clinics } = useClinicContext();
+  const { clinics, selected } = useClinicContext();
   useEffect(() => {
     const refresh = () => {
       if (document.visibilityState === "visible") remote.reload();
@@ -129,28 +129,29 @@ export function AppointmentTokens() {
     };
   }, [remote.reload]);
   const today = clinicDayKey();
-  const appointments =
-    remote.data?.filter(
-      (a) =>
-        a.token &&
-        !["cancelled", "completed", "no_show"].includes(a.status) &&
-        a.scheduledAt.slice(0, 10) >= today,
-    ) ?? [];
-  const recentOrCancelled =
-    remote.data
-      ?.filter(
-        (a) =>
-          ["cancelled", "completed", "no_show"].includes(a.status) ||
-          a.scheduledAt.slice(0, 10) < today,
-      )
-      .slice(0, 3) ?? [];
+  const hasClinicFilter = Boolean(selected && selected !== "all");
+  const selectedClinic = hasClinicFilter
+    ? clinics.find((clinic) => clinic.id === selected)
+    : undefined;
+  const scopedAppointments = sortPatientAppointments(
+    (remote.data ?? []).filter((a) => !hasClinicFilter || a.clinicId === selected),
+    today,
+  );
+  const appointments = scopedAppointments.filter(
+    (a) => a.token && isUpcomingActiveAppointment(a, today),
+  );
+  const recentOrCancelled = scopedAppointments
+    .filter((a) => !isUpcomingActiveAppointment(a, today))
+    .slice(0, 3);
   if (!remote.data) return remote.error ? <p role="alert">{remote.error}</p> : null;
   return (
     <section className="mb-8 space-y-4" aria-label="Appointment tokens">
       {appointments.length ? (
         <>
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold tracking-tight">Upcoming appointments</h2>
+            <h2 className="text-base font-semibold tracking-tight">
+              {selectedClinic ? `Upcoming appointments · ${selectedClinic.name}` : "Upcoming appointments"}
+            </h2>
             <a
               href="/patient/appointments"
               className="text-xs font-medium text-primary hover:underline"
@@ -177,7 +178,7 @@ export function AppointmentTokens() {
                       <AppointmentStatusBadge status={a.status} />
                     </div>
                     <p className="tabular-nums mt-3 text-sm text-foreground">
-                      {a.scheduledAt.slice(0, 10)} · {appointmentTimeLabel(a.scheduledAt.slice(11))}
+                      {formatDateTime(a.scheduledAt)}
                     </p>
                     <p className="tabular mt-3 break-all text-4xl font-semibold text-primary">
                       {a.token!.tokenCode}
@@ -185,13 +186,7 @@ export function AppointmentTokens() {
                     {a.scheduledAt.slice(0, 10) > today && (
                       <p className="mt-3 text-sm text-muted-foreground">
                         Your token becomes active in the clinic queue on{" "}
-                        {new Date(a.scheduledAt.slice(0, 10) + "T12:00:00Z").toLocaleDateString(
-                          "en-GB",
-                          {
-                            day: "numeric",
-                            month: "short",
-                          },
-                        )}
+                        {formatDateOnly(a.scheduledAt.slice(0, 10))}
                         .
                       </p>
                     )}
@@ -262,7 +257,7 @@ export function AppointmentTokens() {
                 <div className="min-w-0">
                   <p className="font-medium text-foreground">{a.clinicName}</p>
                   <p className="tabular-nums text-xs text-muted-foreground">
-                    {a.scheduledAt.slice(0, 10)} · {appointmentTimeLabel(a.scheduledAt.slice(11))}
+                    {formatDateTime(a.scheduledAt)}
                     {a.token ? ` · Token ${a.token.tokenCode}` : ""}
                   </p>
                 </div>

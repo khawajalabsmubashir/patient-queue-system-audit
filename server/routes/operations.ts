@@ -55,8 +55,10 @@ export function operationsRoutes(
   r.get("/patient/appointments", requireRole(db, "patient"), async (_req, res) => {
     const rows = await many<Record<string, unknown>>(
       db,
-      "SELECT a.*,CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END status,c.name clinic_name,t.id token_id,t.token_code,t.status token_status FROM appointments a JOIN clinics c ON c.id=a.clinic_id LEFT JOIN appointment_workflow w ON w.appointment_id=a.id LEFT JOIN tokens t ON t.appointment_id=a.id WHERE a.patient_id=? ORDER BY a.scheduled_at DESC LIMIT 200",
+      "SELECT a.*,CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END status,c.name clinic_name,t.id token_id,t.token_code,t.status token_status FROM appointments a JOIN clinics c ON c.id=a.clinic_id LEFT JOIN appointment_workflow w ON w.appointment_id=a.id LEFT JOIN tokens t ON t.appointment_id=a.id WHERE a.patient_id=? ORDER BY CASE WHEN (CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END) IN ('scheduled','confirmed','checked_in') AND substr(a.scheduled_at,1,10)>=? THEN 0 ELSE 1 END ASC, CASE WHEN (CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END) IN ('scheduled','confirmed','checked_in') AND substr(a.scheduled_at,1,10)>=? THEN a.scheduled_at ELSE '' END ASC, a.scheduled_at DESC LIMIT 200",
       user(res).id,
+      clinicDayKey(),
+      clinicDayKey(),
     );
     res.json({
       success: true,

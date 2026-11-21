@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/domain/date-format";
 import { useEffect, useRef, useState } from "react";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
 import { api } from "@/api/client";
@@ -179,7 +180,7 @@ export function AttentionEditor({
           {remote.data.history.map((h, i) => (
             <li key={i}>
               <p>
-                {h.actor} · {new Date(h.at).toLocaleString("en-GB", { timeZone: "Asia/Karachi" })}
+                {h.actor} · {formatDateTime(h.at)}
               </p>
               <p className="text-xs text-muted-foreground">
                 {h.before.priority} → {h.after.priority}

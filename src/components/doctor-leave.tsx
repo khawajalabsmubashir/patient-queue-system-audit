@@ -1,3 +1,4 @@
+import { formatDateOnly } from "@/domain/date-format";
 import { useRef, useState } from "react";
 import { useClinicalData, ClinicalLoading } from "@/components/clinical";
 import { api } from "@/api/client";

@@ -1,3 +1,4 @@
+import { formatDateOnly, formatTime12h } from "@/domain/date-format";
 import { AttentionBadges } from "@/components/appointment-attention";
 import { useAuth } from "@/providers/auth-provider";
 import { api } from "@/api/client";
@@ -147,9 +148,9 @@ export function AppointmentRows({
           key={a.id}
           className="grid min-w-0 items-center gap-3 px-5 py-4 text-sm sm:grid-cols-2 xl:grid-cols-[90px_1.2fr_1fr_1fr_100px_150px]"
         >
-          <span className="text-muted-foreground">
-            {a.scheduledAt.slice(11)}
-            <span className="block text-xs">{a.scheduledAt.slice(0, 10)}</span>
+          <span className="tabular-nums text-muted-foreground">
+            {formatTime12h(a.scheduledAt.slice(11))}
+            <span className="block text-xs">{formatDateOnly(a.scheduledAt.slice(0, 10))}</span>
           </span>
           <div className="min-w-0">
           {readOnly ? (

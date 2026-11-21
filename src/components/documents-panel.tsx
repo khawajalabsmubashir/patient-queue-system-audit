@@ -1,3 +1,4 @@
+import { formatDateOnly } from "@/domain/date-format";
 import { uploadPrivateFile } from "@/lib/private-upload";
 import { SelectField } from "@/components/form-controls";
 import { PatientPicker } from "@/components/patient-picker";
@@ -202,7 +203,7 @@ export function DocumentsPanel({
                 <h3 className="font-medium">{d.title}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {d.document_type.replaceAll("_", " ")} · {d.clinic_name} ·{" "}
-                  {new Date(d.created_at).toLocaleDateString()}
+                  {formatDateOnly(d.created_at)}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {d.original_filename} · {(d.file_size / 1024).toFixed(0)} KB{" "}

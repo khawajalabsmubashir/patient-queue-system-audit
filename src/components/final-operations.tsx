@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/compone
 import { logout } from "@/services/auth";
 import { NotificationCenter } from "@/components/notification-center";
 import { AppointmentStatusBadge } from "@/components/appointment-tokens";
+import { formatDateOnly, formatDateTime } from "@/domain/date-format";
 
 type Metrics = {
   patients: number;
@@ -459,7 +460,7 @@ export function FollowUps() {
               </a>
               <p className="text-sm text-muted-foreground">
                 {f.clinic_name} · Follow-up {String(f.follow_up_date).slice(0, 10)} · Last visit{" "}
-                {new Date(f.visit_at).toLocaleDateString()} · {f.status}
+                {formatDateOnly(f.visit_at)} · {f.status}
               </p>
               <p className="whitespace-pre-wrap break-words text-sm">
                 {f.instructions || "Follow-up visit recommended."}
@@ -758,7 +759,7 @@ export function AccountSettings() {
           {d.sessions.map((s, i) => (
             <li key={i}>
               {s.current ? "This session" : "Other session"} · Expires{" "}
-              {new Date(s.expiresAt).toLocaleString()}
+              {formatDateTime(s.expiresAt)}
             </li>
           ))}
         </ul>
@@ -780,13 +781,18 @@ export function AccountSettings() {
 }
 export function PatientSummary() {
   const { clinic } = useQueue();
+  const { selected } = useClinicContext();
+  const activeClinicId = selected && selected !== "all" ? selected : "";
   const remote = useClinicalData<{
-    appointment: { scheduled_at: string; clinic_name: string } | null;
-    visit: { visit_at: string; clinic_name: string } | null;
-    prescription: { prescribed_at: string } | null;
+    appointment: { clinic_id?: string; scheduled_at: string; clinic_name: string; status?: string } | null;
+    appointments?: { id: string; clinic_id: string; scheduled_at: string; clinic_name: string; status?: string }[];
+    visit: { clinic_id?: string; visit_at: string; clinic_name: string } | null;
+    visits?: { clinic_id?: string; visit_at: string; clinic_name: string }[];
+    prescription: { clinic_id?: string; prescribed_at: string } | null;
+    prescriptions?: { clinic_id?: string; prescribed_at: string }[];
     document: { title: string } | null;
     bills: { balance: number };
-    followups: FollowUp[];
+    followups: (FollowUp & { clinic_id?: string })[];
     notifications: { id: string; title: string; message: string }[];
   }>("/patient/summary");
   if (!remote.data)
@@ -796,17 +802,37 @@ export function PatientSummary() {
       </section>
     );
   const d = remote.data;
+  const scopedAppointments = (d.appointments ?? (d.appointment ? [d.appointment] : []))
+    .filter((a) => !activeClinicId || !a.clinic_id || a.clinic_id === activeClinicId)
+    .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+  const upcomingAppointment = scopedAppointments[0] ?? null;
+  const latestVisit =
+    d.visits?.find((v) => !activeClinicId || !v.clinic_id || v.clinic_id === activeClinicId) ??
+    (d.visit && (!activeClinicId || !d.visit.clinic_id || d.visit.clinic_id === activeClinicId)
+      ? d.visit
+      : null);
+  const latestPrescription =
+    d.prescriptions?.find(
+      (p) => !activeClinicId || !p.clinic_id || p.clinic_id === activeClinicId,
+    ) ??
+    (d.prescription &&
+    (!activeClinicId || !d.prescription.clinic_id || d.prescription.clinic_id === activeClinicId)
+      ? d.prescription
+      : null);
+  const scopedFollowups = [...d.followups]
+    .filter((f) => !activeClinicId || !f.clinic_id || f.clinic_id === activeClinicId)
+    .sort((a, b) => String(a.follow_up_date).localeCompare(String(b.follow_up_date)));
   const cards: { title: string; value: string; href: string }[] = [];
-  if (d.visit)
+  if (latestVisit)
     cards.push({
       title: "Latest visit",
-      value: new Date(d.visit.visit_at).toLocaleDateString() + " · " + d.visit.clinic_name,
+      value: formatDateOnly(latestVisit.visit_at) + " · " + latestVisit.clinic_name,
       href: "/patient/visits",
     });
-  if (d.prescription)
+  if (latestPrescription)
     cards.push({
       title: "Latest prescription",
-      value: new Date(d.prescription.prescribed_at).toLocaleDateString(),
+      value: formatDateOnly(latestPrescription.prescribed_at),
       href: "/patient/prescriptions",
     });
   if (Number(d.bills.balance) > 0)
@@ -815,7 +841,7 @@ export function PatientSummary() {
       value: money(d.bills.balance),
       href: "/patient/billing",
     });
-  const hasCareData = cards.length > 0 || d.followups.length > 0;
+  const hasCareData = cards.length > 0 || scopedFollowups.length > 0;
   return (
     <section
       aria-label="Your care summary"
@@ -832,17 +858,17 @@ export function PatientSummary() {
           </a>
         </div>
         <div className="mt-4 divide-y divide-border">
-          {d.appointment ? (
+          {upcomingAppointment ? (
             <a
               href="/patient/appointments"
               className="block py-3 first:pt-0 transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-foreground">Upcoming appointment</h3>
-                <AppointmentStatusBadge status="scheduled" />
+                <AppointmentStatusBadge status={upcomingAppointment.status || "scheduled"} />
               </div>
               <p className="tabular-nums mt-1 break-words text-sm text-muted-foreground">
-                {d.appointment.scheduled_at.replace("T", " ") + " · " + d.appointment.clinic_name}
+                {formatDateTime(upcomingAppointment.scheduled_at) + " · " + upcomingAppointment.clinic_name}
               </p>
             </a>
           ) : (
@@ -875,14 +901,14 @@ export function PatientSummary() {
             </a>
           ))}
         </div>
-        {d.followups.length > 0 && (
+        {scopedFollowups.length > 0 && (
           <div className="mt-3 border-t border-border pt-3">
             <h3 className="text-sm font-semibold text-foreground">Follow-up recommendations</h3>
             <div className="mt-2 space-y-2">
-              {d.followups.map((f) => (
+              {scopedFollowups.map((f) => (
                 <div key={f.id} className="rounded-lg border border-border/70 bg-muted/30 p-3 text-sm">
                   <p className="tabular-nums font-medium">
-                    {String(f.follow_up_date).slice(0, 10)} · {f.clinic_name} · {f.status}
+                    {formatDateOnly(String(f.follow_up_date).slice(0, 10))} · {f.clinic_name} · {f.status}
                   </p>
                   <p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">
                     {f.instructions || "Follow-up visit recommended."}

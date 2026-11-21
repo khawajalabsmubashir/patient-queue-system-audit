@@ -1,3 +1,4 @@
+import { formatDateTime } from "@/domain/date-format";
 import { SelectField } from "@/components/form-controls";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
@@ -159,7 +160,7 @@ function Staff() {
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {s.last_activity_at
-                    ? "Last sign-in: " + new Date(s.last_activity_at).toLocaleString()
+                    ? "Last sign-in: " + formatDateTime(s.last_activity_at)
                     : "No sign-in recorded"}
                 </p>
               </div>

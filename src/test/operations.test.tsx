@@ -156,3 +156,75 @@ it("notification links resolve to relevant patient and staff pages", () => {
   expect(notificationHref({ ...n, entity_type: "queue" }, "nurse")).toBe("/staff");
   expect(notificationHref({ ...n, entity_type: "document" }, "patient")).toBe("/patient/documents");
 });
+
+it("BUG-24: notification bell groups by Today/Yesterday/Older, filters tabs, shows 12h time without seconds & type badges", async () => {
+  const now = new Date();
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const older = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
+  fixture.api.mockResolvedValue([
+    {
+      id: "n-today",
+      type: "appointment.booked",
+      title: "Booked today",
+      message: "Your appointment is confirmed.",
+      entity_type: "appointment",
+      entity_id: "appt-1",
+      clinic_id: "clinic",
+      read_at: null,
+      created_at: now.toISOString(),
+    },
+    {
+      id: "n-yesterday",
+      type: "invoice.issued",
+      title: "Bill yesterday",
+      message: "Invoice generated yesterday.",
+      entity_type: "invoice",
+      entity_id: "inv-1",
+      clinic_id: "clinic",
+      read_at: yesterday.toISOString(),
+      created_at: yesterday.toISOString(),
+    },
+    {
+      id: "n-older",
+      type: "prescription.ready",
+      title: "Rx older",
+      message: "Older prescription note.",
+      entity_type: "prescription",
+      entity_id: "rx-1",
+      clinic_id: "clinic",
+      read_at: older.toISOString(),
+      created_at: older.toISOString(),
+    },
+  ]);
+
+  render(<NotificationCenter />);
+  const bell = await screen.findByRole("button", { name: "Notifications" });
+  fireEvent.keyDown(bell, { key: "Enter" });
+
+  expect(await screen.findByRole("tab", { name: "All" })).toBeVisible();
+  expect(screen.getByRole("tab", { name: "Today" })).toBeVisible();
+  expect(screen.getByRole("tab", { name: "Yesterday" })).toBeVisible();
+  expect(screen.getByText("Appointment")).toBeVisible();
+  expect(screen.getByText("Billing")).toBeVisible();
+  expect(screen.getByText("Prescription")).toBeVisible();
+  expect(screen.getByText("Booked today")).toBeVisible();
+  expect(screen.getByText("Bill yesterday")).toBeVisible();
+  expect(screen.getByText("Rx older")).toBeVisible();
+
+  // Verify unread card uses inner padding (does not sit flush on outer edge) and 12h time without seconds
+  const unreadCard = screen.getByText("Booked today").closest("article")!;
+  expect(unreadCard.className).toContain("px-3.5");
+  const timeEl = unreadCard.querySelector("time")!;
+  expect(timeEl.textContent).toMatch(/(AM|PM)$/);
+  expect(timeEl.textContent).not.toMatch(/:\d{2}:\d{2}/);
+  expect(timeEl).toHaveAttribute("title");
+
+  fireEvent.click(screen.getByRole("tab", { name: "Today" }));
+  expect(screen.getByText("Booked today")).toBeVisible();
+  expect(screen.queryByText("Bill yesterday")).toBeNull();
+  expect(screen.queryByText("Rx older")).toBeNull();
+
+  fireEvent.click(screen.getByRole("tab", { name: "Yesterday" }));
+  expect(screen.getByText("Bill yesterday")).toBeVisible();
+  expect(screen.queryByText("Booked today")).toBeNull();
+});

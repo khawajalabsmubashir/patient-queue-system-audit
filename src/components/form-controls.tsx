@@ -141,8 +141,45 @@ export function TemporalInput({
   const [local, setLocal] = React.useState(initial);
   const current = String(value ?? local);
   const [open, setOpen] = React.useState(false);
+  const [dialogContainer, setDialogContainer] = React.useState<HTMLElement | null>(null);
+  const [scrollContainer, setScrollContainer] = React.useState<HTMLElement | null>(null);
+  const wrapper = React.useRef<HTMLDivElement>(null);
   const backing = React.useRef<HTMLInputElement>(null);
   const input = React.useRef<HTMLInputElement>(null);
+
+  React.useLayoutEffect(() => {
+    const dialogEl = (wrapper.current?.closest("[role=\"dialog\"]") as HTMLElement | null) ?? null;
+    const scrollEl =
+      (wrapper.current?.closest("[data-dialog-body=\"true\"]") as HTMLElement | null) ?? null;
+    setDialogContainer(dialogEl);
+    setScrollContainer(scrollEl);
+  }, [open]);
+
+  React.useEffect(() => {
+    if (!open || !scrollContainer) return;
+    let raf = 0;
+    const onScroll = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const anchorRect = wrapper.current?.getBoundingClientRect();
+        const scrollerRect = scrollContainer.getBoundingClientRect();
+        if (
+          anchorRect &&
+          scrollerRect.height > 0 &&
+          (anchorRect.bottom < scrollerRect.top || anchorRect.top > scrollerRect.bottom)
+        ) {
+          setOpen(false);
+          return;
+        }
+        window.dispatchEvent(new Event("resize"));
+      });
+    };
+    scrollContainer.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      cancelAnimationFrame(raf);
+      scrollContainer.removeEventListener("scroll", onScroll);
+    };
+  }, [open, scrollContainer]);
   const generatedId = React.useId();
   const inputId = id ?? generatedId;
   const datePart = type === "time" ? "" : current.split("T")[0];
@@ -212,7 +249,7 @@ export function TemporalInput({
     );
   }
   return (
-    <div className="relative min-w-0">
+    <div ref={wrapper} className="relative min-w-0">
       <input
         {...props}
         id={inputId}
@@ -264,7 +301,11 @@ export function TemporalInput({
         </PopoverTrigger>
         <PopoverContent
           align="start"
-          className="w-auto max-w-[calc(100vw-2rem)] rounded-lg bg-card p-0"
+          container={dialogContainer}
+          {...(dialogContainer ? { collisionBoundary: dialogContainer } : {})}
+          collisionPadding={10}
+          sticky="always"
+          className="w-auto max-w-[calc(100vw-3rem)] max-h-[calc(80dvh-2rem)] overflow-y-auto rounded-lg bg-card p-0 shadow-lg"
           onCloseAutoFocus={(e) => {
             e.preventDefault();
             input.current?.focus();

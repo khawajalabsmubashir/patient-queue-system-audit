@@ -1,3 +1,4 @@
+import { formatDateOnly, formatDateTime } from "@/domain/date-format";
 import { SelectField } from "@/components/form-controls";
 import { PrintBranding } from "@/components/final-operations";
 import { useEffect, useRef, useState } from "react";
@@ -310,13 +311,13 @@ export function BillingWorkspace({ portal = false }: { portal?: boolean }) {
                 <p className="font-semibold">Invoice {i.invoice_number}</p>
                 <p className="text-sm">
                   {i.status.replaceAll("_", " ")} ·{" "}
-                  {new Date(i.issued_at ?? i.created_at).toLocaleDateString()}
+                  {formatDateOnly(i.issued_at ?? i.created_at)}
                 </p>
               </div>
             </div>
             <p className="my-5 text-sm">
               Patient: <strong>{i.patient_name}</strong>
-              {i.due_at && <> · Due {i.due_at}</>}
+              {i.due_at && <> · Due {formatDateOnly(i.due_at)}</>}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[440px] text-left text-sm">
@@ -361,7 +362,7 @@ export function BillingWorkspace({ portal = false }: { portal?: boolean }) {
             <h3 className="mt-6 font-semibold">Payment history</h3>
             {i.payments?.map((p) => (
               <p key={p.id} className="mt-2 text-sm">
-                {new Date(p.paid_at).toLocaleString()} · {p.method.replaceAll("_", " ")} ·{" "}
+                {formatDateTime(p.paid_at)} · {p.method.replaceAll("_", " ")} ·{" "}
                 {money(p.amount)} {p.reference && "· " + p.reference}
               </p>
             ))}
