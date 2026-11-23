@@ -130,16 +130,19 @@ export function BillingWorkspace({ portal = false }: { portal?: boolean }) {
     i = detail.data;
   return (
     <div className="space-y-6">
-      <div className="print:hidden flex flex-wrap gap-3">
-        <Field
-          label="Search invoices or patient"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <label className="text-sm font-medium">
-          Status
+      <div className="print:hidden flex flex-wrap items-end gap-3">
+        <div className="min-w-[220px] flex-1 sm:max-w-xs">
+          <Field
+            label="Search invoices or patient"
+            placeholder="Search invoices or patients"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <label className="block">
+          <span className="mb-1.5 block text-sm font-medium">Status</span>
           <SelectField
-            className="mt-2 block rounded-lg border bg-card p-3"
+            className="h-11 min-w-40 rounded-lg border border-input bg-card px-3.5 text-sm"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
           >

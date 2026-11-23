@@ -7,6 +7,7 @@ import {
   Receipt,
   Stethoscope,
   Ticket,
+  X,
 } from "lucide-react";
 import { api } from "@/api/client";
 import { Btn } from "@/components/qc";
@@ -27,6 +28,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 
 type DateFilter = "all" | "today" | "yesterday";
+
+function useIsMobileViewport() {
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" && typeof window.matchMedia === "function"
+      ? window.matchMedia("(max-width: 639px)").matches
+      : false,
+  );
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof window.matchMedia !== "function") return;
+    const mq = window.matchMedia("(max-width: 639px)");
+    const update = () => setIsMobile(mq.matches);
+    update();
+    mq.addEventListener?.("change", update);
+    return () => mq.removeEventListener?.("change", update);
+  }, []);
+  return isMobile;
+}
 
 export function notificationHref(n: AppNotification, role: string) {
   const patient = role === "patient";
@@ -111,6 +129,8 @@ export function NotificationCenter() {
   const [items, setItems] = useState<AppNotification[]>([]);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<DateFilter>("all");
+  const [open, setOpen] = useState(false);
+  const isMobile = useIsMobileViewport();
 
   async function refresh() {
     try {
@@ -175,36 +195,37 @@ export function NotificationCenter() {
 
   const unreadCount = items.filter((n) => !n.read_at).length;
 
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          aria-label="Notifications"
-          className="relative grid size-11 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted"
-        >
-          <Bell className="size-[18px]" />
-          {unreadCount > 0 && (
-            <span className="absolute right-0 top-0 rounded-full bg-primary px-1.5 text-[10px] text-primary-foreground">
-              {unreadCount}
-            </span>
-          )}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align="end"
-        className="max-h-[75vh] w-[24rem] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl p-4"
-      >
+  const panelBody = (
+    <>
+      <div className="shrink-0 border-b border-border px-4 pb-3 pt-3.5">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <h2 className="font-semibold text-foreground">Notifications</h2>
-          <Btn variant="ghost" onClick={() => void read()}>
-            Mark all read
-          </Btn>
+          <div className="flex items-center gap-2">
+            <h2 className="font-semibold text-foreground">Notifications</h2>
+            {unreadCount > 0 && (
+              <span className="rounded-md bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary tabular">
+                {unreadCount} new
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            <Btn variant="ghost" className="h-8 px-2.5 text-xs" onClick={() => void read()}>
+              Mark all read
+            </Btn>
+            <button
+              type="button"
+              aria-label="Close notifications"
+              onClick={() => setOpen(false)}
+              className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <X className="size-4" aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <div
           role="tablist"
           aria-label="Filter notifications by date"
-          className="mb-3 inline-flex w-full items-center gap-1 rounded-lg bg-muted/60 p-1"
+          className="inline-flex w-full items-center gap-1 rounded-lg bg-muted/60 p-1"
         >
           {(
             [
@@ -229,7 +250,9 @@ export function NotificationCenter() {
             </button>
           ))}
         </div>
+      </div>
 
+      <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-2.5">
         {error && (
           <p role="alert" className="mb-2 text-sm text-destructive">
             {error}
@@ -242,7 +265,7 @@ export function NotificationCenter() {
               <h3 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                 {group.label}
               </h3>
-              <div className="space-y-1.5">
+              <div className="space-y-2">
                 {group.list.map((n) => {
                   const meta = notificationMeta(n);
                   const Icon = meta.Icon;
@@ -253,8 +276,8 @@ export function NotificationCenter() {
                       className={
                         "rounded-lg border px-3.5 py-2.5 transition " +
                         (unread
-                          ? "border-primary/20 border-l-4 border-l-primary bg-primary/5"
-                          : "border-transparent hover:bg-muted/50")
+                          ? "border-primary/30 bg-primary/5"
+                          : "border-border/60 bg-card hover:bg-muted/40")
                       }
                     >
                       <div className="flex items-start gap-3">
@@ -268,6 +291,7 @@ export function NotificationCenter() {
                             href={notificationHref(n, profile?.role ?? "patient")}
                             onClick={(e) => {
                               e.preventDefault();
+                              setOpen(false);
                               void read(n.id).then(() =>
                                 window.location.assign(
                                   notificationHref(n, profile?.role ?? "patient"),
@@ -315,10 +339,76 @@ export function NotificationCenter() {
         </div>
 
         {!grouped.length && !error && (
-          <p className="py-5 text-center text-sm text-muted-foreground">
+          <p className="py-6 text-center text-sm text-muted-foreground">
             {items.length ? `No notifications for ${filter}.` : "You’re all caught up."}
           </p>
         )}
+      </div>
+    </>
+  );
+
+  const bellTrigger = (
+    <button
+      type="button"
+      aria-label="Notifications"
+      aria-expanded={open}
+      onClick={isMobile ? () => setOpen((v) => !v) : undefined}
+      onKeyDown={
+        isMobile
+          ? (e) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                setOpen((v) => !v);
+              }
+            }
+          : undefined
+      }
+      className="relative grid size-10 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Bell className="size-[18px]" aria-hidden="true" />
+      {unreadCount > 0 && (
+        <span className="tabular absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] font-semibold text-white">
+          {unreadCount}
+        </span>
+      )}
+    </button>
+  );
+
+  if (isMobile) {
+    return (
+      <>
+        {bellTrigger}
+        {open && (
+          <div className="fixed inset-0 z-50 flex flex-col justify-end" role="presentation">
+            <div
+              className="fixed inset-0 bg-black/35 backdrop-blur-[1px]"
+              aria-hidden="true"
+              onClick={() => setOpen(false)}
+            />
+            <section
+              role="dialog"
+              aria-label="Notifications"
+              className="relative z-10 flex max-h-[65dvh] w-full flex-col overflow-hidden rounded-t-2xl border-t border-border bg-card shadow-2xl"
+            >
+              <div className="flex justify-center pt-2">
+                <span className="h-1 w-10 rounded-full bg-border" aria-hidden="true" />
+              </div>
+              {panelBody}
+            </section>
+          </div>
+        )}
+      </>
+    );
+  }
+
+  return (
+    <DropdownMenu modal={false} open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>{bellTrigger}</DropdownMenuTrigger>
+      <DropdownMenuContent
+        align="end"
+        className="flex max-h-[70vh] w-[25rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl p-0 shadow-lg"
+      >
+        {panelBody}
       </DropdownMenuContent>
     </DropdownMenu>
   );

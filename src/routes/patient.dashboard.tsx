@@ -1,40 +1,22 @@
-import { AppointmentTokens } from "@/components/appointment-tokens";
-import { PatientSummary } from "@/components/final-operations";
-import { useAuth } from "@/providers/auth-provider";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  BellRing,
-  CalendarPlus,
-  ClipboardList,
-  Clock,
-  MapPin,
-  Pill,
-  Receipt,
-  Ticket,
-  Users,
-} from "lucide-react";
+import { useAuth } from "@/providers/auth-provider";
+import { Clock, Ticket, Users } from "lucide-react";
 import { useQueue } from "@/lib/queue-store";
 import { Btn, Label, LiveDot, StatusPill } from "@/components/qc";
 import { PatientStatus } from "@/components/queue-feedback";
-import { prefetchClinicalData } from "@/components/clinical";
+import { AppointmentTokens } from "@/components/appointment-tokens";
+import { PatientSummary } from "@/components/final-operations";
+import { prefetchClinicalData, useClinicalData } from "@/components/clinical";
+import { useClinicContext } from "@/providers/clinic-provider";
+import { clinicDayKey } from "@/utils/clinic-date";
+import {
+  formatLongGreetingDate,
+  isUpcomingActiveAppointment,
+  sortPatientAppointments,
+} from "@/domain/date-format";
+import type { Appointment } from "@/types/local";
 
-export const Route = createFileRoute("/patient/dashboard")({
-  head: () => ({
-    meta: [
-      { title: "Your queue status — Neuro Spine Care Center" },
-      {
-        name: "description",
-        content: "See your token, people ahead, and estimated wait at a glance.",
-      },
-      { property: "og:title", content: "Your queue status — Neuro Spine Care Center" },
-      {
-        property: "og:description",
-        content: "See your token, people ahead, and estimated wait at a glance.",
-      },
-    ],
-  }),
-  component: Dashboard,
-});
+export const Route = createFileRoute("/patient/dashboard")({ component: Dashboard });
 
 export function QueueHero() {
   const { mine, serving, ahead, eta, waiting, avgMin, clinic } = useQueue();
@@ -131,34 +113,107 @@ export function QueueHero() {
   );
 }
 
-function Dashboard() {
-  const { mine, open, clinic } = useQueue();
-  const { profile } = useAuth();
+function LiveQueueCard() {
+  const { serving, waiting, mine, ahead, avgMin, open } = useQueue();
+  const { selected } = useClinicContext();
+  const appts = useClinicalData<Appointment[]>("/patient/appointments");
+  const today = clinicDayKey();
+  const hasClinicFilter = Boolean(selected && selected !== "all");
+  const nextApptToken = sortPatientAppointments(
+    (appts.data ?? []).filter((a) => !hasClinicFilter || a.clinicId === selected),
+    today,
+  ).find((a) => a.token && isUpcomingActiveAppointment(a, today))?.token?.tokenCode;
+
+  const isServing = mine?.status === "serving";
+  const eta = Math.max(ahead * avgMin, avgMin);
+  const displayToken = mine?.token ?? nextApptToken ?? "—";
+
   return (
-    <>
-      <section className="surface mb-8 flex min-w-0 flex-col justify-between gap-6 overflow-hidden bg-gradient-to-br from-card via-card to-primary-soft/45 p-6 md:flex-row md:items-center md:p-8">
-        <div className="min-w-0 flex-1">
-          <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground">
-            <span className={`size-2 rounded-full ${open ? "bg-success" : "bg-muted-foreground"}`} />
-            {clinic.name || "Selected clinic"} · {open ? "Queue open" : "Queue closed"}
-          </div>
-          <h1 className="mt-3 break-words [overflow-wrap:anywhere] text-[28px] font-semibold tracking-tight md:text-[34px]">
-            Good morning, {profile?.fullName.split(" ")[0]}
+    <section
+      aria-label="Live queue status"
+      className="surface order-first p-6 lg:col-start-2 lg:row-start-1 lg:order-none"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">Live queue</h2>
+        <span
+          className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+            open
+              ? "bg-primary-soft text-primary"
+              : "bg-muted text-muted-foreground"
+          }`}
+        >
+          {open ? "Queue open" : "Queue closed"}
+        </span>
+      </div>
+
+      {mine && (
+        <div className="mt-4">
+          <PatientStatus />
+        </div>
+      )}
+
+      <dl className="mt-4 divide-y divide-border text-sm">
+        <div className="flex items-center justify-between py-2.5 first:pt-0">
+          <dt className="text-muted-foreground">Now serving</dt>
+          <dd className="tabular font-semibold text-foreground">{serving?.token ?? "—"}</dd>
+        </div>
+        <div className="flex items-center justify-between py-2.5">
+          <dt className="text-muted-foreground">Your token</dt>
+          <dd className="tabular font-semibold text-foreground">{displayToken}</dd>
+        </div>
+        <div className="flex items-center justify-between py-2.5">
+          <dt className="text-muted-foreground">Ahead of you</dt>
+          <dd className="tabular font-semibold text-foreground">
+            {mine ? (isServing ? "0" : String(ahead)) : "—"}
+          </dd>
+        </div>
+        <div className="flex items-center justify-between py-2.5 last:pb-0">
+          <dt className="text-muted-foreground">Estimated wait</dt>
+          <dd className="tabular font-semibold text-foreground">
+            {mine ? (isServing ? "Now" : `~${eta} min`) : "—"}
+          </dd>
+        </div>
+      </dl>
+
+      <p className="mt-3 text-xs text-muted-foreground">
+        {mine
+          ? `Joined ${mine.joinedAt} · ${waiting.length} waiting in clinic queue`
+          : "Live numbers appear here once your token is active."}
+      </p>
+
+      <Link
+        to="/patient/live-queue"
+        className="mt-4 inline-flex h-10 w-full items-center justify-center rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition hover:bg-muted"
+      >
+        Open live queue
+      </Link>
+    </section>
+  );
+}
+
+function Dashboard() {
+  const { profile } = useAuth();
+  const firstName = profile?.fullName.split(" ")[0] || "Patient";
+  const todayLabel = formatLongGreetingDate(new Date());
+
+  return (
+    <div className="space-y-6">
+      <section className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="min-w-0">
+          <h1 className="break-words [overflow-wrap:anywhere] text-[26px] font-bold tracking-tight text-foreground md:text-[30px]">
+            Good morning, {firstName}
           </h1>
-          <p className="mt-1.5 text-[15px] text-muted-foreground">
-            Track your live queue status, upcoming appointments, and care summary at a glance.
+          <p className="mt-1 text-sm text-muted-foreground">
+            {todayLabel} · Your appointments, queue and care summary.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2.5 shrink-0">
+        <div className="flex shrink-0 flex-wrap items-center gap-2.5">
           <Link
             to="/patient/appointments"
             search={{ book: "1" } as never}
             onMouseEnter={() => prefetchClinicalData("/patient/appointments")}
           >
-            <Btn>
-              <CalendarPlus className="size-4" />
-              Book appointment
-            </Btn>
+            <Btn>Book appointment</Btn>
           </Link>
           <Link to="/patient/live-queue">
             <Btn variant="secondary">Live queue</Btn>
@@ -166,103 +221,51 @@ function Dashboard() {
         </div>
       </section>
 
-      <AppointmentTokens />
-
-      {mine && (
-        <div className="mb-8">
-          <PatientStatus />
-          <QueueHero />
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.48fr)_minmax(310px,0.92fr)] lg:items-start">
+        <div className="space-y-6 lg:col-start-1 lg:row-start-1 lg:row-span-2">
+          <AppointmentTokens />
+          <PatientSummary hideUpcoming />
         </div>
-      )}
 
-      <section aria-label="Quick actions" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-        {[
-          {
-            to: "/patient/appointments",
-            title: "Appointments",
-            desc: "Schedule or manage tokens",
-            icon: Ticket,
-            prefetch: "/patient/appointments",
-          },
-          {
-            to: "/patient/visits",
-            title: "My visits",
-            desc: "Consultation summaries",
-            icon: ClipboardList,
-            prefetch: "/patient/visits",
-          },
-          {
-            to: "/patient/prescriptions",
-            title: "Prescriptions",
-            desc: "Medicines & A4 print",
-            icon: Pill,
-            prefetch: "/patient/prescriptions",
-          },
-          {
-            to: "/patient/billing",
-            title: "Billing",
-            desc: "Invoices & payments",
-            icon: Receipt,
-            prefetch: "/billing/invoices?clinicId=all",
-          },
-        ].map((item) => (
-          <Link
-            key={item.to}
-            to={item.to}
-            onMouseEnter={() => prefetchClinicalData(item.prefetch)}
-            onFocus={() => prefetchClinicalData(item.prefetch)}
-            className="surface group flex items-center gap-3.5 p-4 transition hover:border-primary/40 hover:shadow-lift"
-          >
-            <div className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary-soft text-primary transition group-hover:bg-primary group-hover:text-primary-foreground">
-              <item.icon className="size-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-sm font-semibold">{item.title}</p>
-              <p className="truncate text-xs text-muted-foreground">{item.desc}</p>
-            </div>
-          </Link>
-        ))}
-      </section>
+        <LiveQueueCard />
 
-      <div className="mt-8 grid items-stretch gap-6 lg:grid-cols-[1.05fr_1fr]">
-        <section className="surface p-6">
-          <h2 className="text-lg font-semibold tracking-tight">Before you arrive</h2>
-          <ul className="mt-4 divide-y divide-border">
+        <section className="surface p-6 lg:col-start-2 lg:row-start-2">
+          <h2 className="text-base font-semibold tracking-tight text-foreground">
+            Before you arrive
+          </h2>
+          <ol className="mt-4 space-y-4">
             {(
               [
                 [
-                  BellRing,
+                  "1",
                   "Arrive when 3 patients are ahead",
-                  "We'll notify you via the bell menu when it's almost your turn.",
+                  "We will notify you when it is almost your turn.",
                 ],
                 [
-                  Ticket,
+                  "2",
                   "Show your token at reception",
-                  "Keep your appointment card or downloaded token PDF ready.",
+                  "Keep this page open or note your token number.",
                 ],
                 [
-                  MapPin,
+                  "3",
                   "Wait near the consultation area",
-                  "Tokens are called on the waiting room display screen in order.",
+                  "Tokens are called on the screen in the lobby.",
                 ],
               ] as const
-            ).map(([Icon, t, d]) => (
-              <li key={t} className="flex gap-4 py-4 first:pt-1 last:pb-1">
-                <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
-                  <Icon className="size-[18px]" />
-                </div>
-                <div>
-                  <div className="text-sm font-medium">{t}</div>
-                  <div className="text-sm text-muted-foreground">{d}</div>
+            ).map(([step, title, desc]) => (
+              <li key={step} className="flex items-start gap-3.5">
+                <span className="tabular grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
+                  {step}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-foreground">{title}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{desc}</p>
                 </div>
               </li>
             ))}
-          </ul>
+          </ol>
         </section>
-
-        {/* Your Care Summary replaces the old standalone Clinic info card */}
-        <PatientSummary />
       </div>
-    </>
+    </div>
   );
 }

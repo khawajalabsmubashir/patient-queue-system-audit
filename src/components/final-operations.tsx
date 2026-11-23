@@ -779,7 +779,7 @@ export function AccountSettings() {
     </>
   );
 }
-export function PatientSummary() {
+export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolean }) {
   const { clinic } = useQueue();
   const { selected } = useClinicContext();
   const activeClinicId = selected && selected !== "all" ? selected : "";
@@ -788,16 +788,16 @@ export function PatientSummary() {
     appointments?: { id: string; clinic_id: string; scheduled_at: string; clinic_name: string; status?: string }[];
     visit: { clinic_id?: string; visit_at: string; clinic_name: string } | null;
     visits?: { clinic_id?: string; visit_at: string; clinic_name: string }[];
-    prescription: { clinic_id?: string; prescribed_at: string } | null;
-    prescriptions?: { clinic_id?: string; prescribed_at: string }[];
+    prescription: { clinic_id?: string; clinic_name?: string; prescribed_at: string } | null;
+    prescriptions?: { clinic_id?: string; clinic_name?: string; prescribed_at: string }[];
     document: { title: string } | null;
-    bills: { balance: number };
+    bills: { balance: number; unpaid_count?: number };
     followups: (FollowUp & { clinic_id?: string })[];
     notifications: { id: string; title: string; message: string }[];
   }>("/patient/summary");
   if (!remote.data)
     return (
-      <section className="surface flex h-full flex-col justify-center p-6">
+      <section className="surface flex flex-col justify-center p-6">
         <ClinicalLoading error={remote.error} retry={remote.reload} />
       </section>
     );
@@ -822,46 +822,22 @@ export function PatientSummary() {
   const scopedFollowups = [...d.followups]
     .filter((f) => !activeClinicId || !f.clinic_id || f.clinic_id === activeClinicId)
     .sort((a, b) => String(a.follow_up_date).localeCompare(String(b.follow_up_date)));
-  const cards: { title: string; value: string; href: string }[] = [];
-  if (latestVisit)
-    cards.push({
-      title: "Latest visit",
-      value: formatDateOnly(latestVisit.visit_at) + " · " + latestVisit.clinic_name,
-      href: "/patient/visits",
-    });
-  if (latestPrescription)
-    cards.push({
-      title: "Latest prescription",
-      value: formatDateOnly(latestPrescription.prescribed_at),
-      href: "/patient/prescriptions",
-    });
-  if (Number(d.bills.balance) > 0)
-    cards.push({
-      title: "Outstanding bills",
-      value: money(d.bills.balance),
-      href: "/patient/billing",
-    });
-  const hasCareData = cards.length > 0 || scopedFollowups.length > 0;
+  const unpaidCount = Number(d.bills.unpaid_count ?? 0);
+  const hasBalance = Number(d.bills.balance) > 0;
+  const hasSummaryGrid = Boolean(latestVisit || latestPrescription || hasBalance);
+  const hasCareData = hasSummaryGrid || scopedFollowups.length > 0;
+
   return (
-    <section
-      aria-label="Your care summary"
-      className="surface flex h-full flex-col justify-between p-6"
-    >
-      <div>
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">Your care summary</h2>
-          <a
-            href="/patient/visits"
-            className="shrink-0 whitespace-nowrap text-xs font-medium text-primary hover:underline"
-          >
-            View records →
-          </a>
-        </div>
-        <div className="mt-4 divide-y divide-border">
+    <section aria-label="Your care summary" className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="text-base font-semibold tracking-tight text-foreground">Care summary</h2>
+      </div>
+      {!hideUpcoming && (
+        <div className="surface p-5">
           {upcomingAppointment ? (
             <a
               href="/patient/appointments"
-              className="block py-3 first:pt-0 transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+              className="block transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
             >
               <div className="flex items-center justify-between gap-2">
                 <h3 className="text-sm font-semibold text-foreground">Upcoming appointment</h3>
@@ -872,58 +848,123 @@ export function PatientSummary() {
               </p>
             </a>
           ) : (
-            <div className="py-3 first:pt-0">
+            <div>
               <h3 className="text-sm font-semibold text-foreground">Upcoming appointment</h3>
               <p className="mt-1 text-sm text-muted-foreground">
                 No upcoming appointment. Choose an available time at {clinic.name || "your clinic"}.
               </p>
               <a
                 href="/patient/appointments?book=1"
-                className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-soft transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="mt-3 inline-flex h-9 items-center justify-center rounded-lg bg-primary px-3.5 text-xs font-medium text-primary-foreground shadow-soft transition hover:bg-primary-hover"
               >
                 Book Appointment
               </a>
             </div>
           )}
-          {cards.map(({ title, value, href }) => (
-            <a
-              href={href}
-              key={title}
-              className="flex items-center justify-between gap-3 py-3 transition hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            >
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-foreground">{title}</h3>
-                <p className="tabular-nums mt-0.5 break-words text-sm text-muted-foreground">
-                  {value}
-                </p>
-              </div>
-              <span className="shrink-0 text-xs font-medium text-primary">Open →</span>
-            </a>
-          ))}
         </div>
-        {scopedFollowups.length > 0 && (
-          <div className="mt-3 border-t border-border pt-3">
-            <h3 className="text-sm font-semibold text-foreground">Follow-up recommendations</h3>
-            <div className="mt-2 space-y-2">
-              {scopedFollowups.map((f) => (
-                <div key={f.id} className="rounded-lg border border-border/70 bg-muted/30 p-3 text-sm">
-                  <p className="tabular-nums font-medium">
-                    {formatDateOnly(String(f.follow_up_date).slice(0, 10))} · {f.clinic_name} · {f.status}
+      )}
+      {!hasCareData && (
+        <div className="surface p-5">
+          <p className="text-sm text-muted-foreground">
+            Your care summary will appear here after your first appointment or clinic visit.
+          </p>
+        </div>
+      )}
+      {hasSummaryGrid && (
+        <div className="surface p-5">
+          <div className="grid gap-3 sm:grid-cols-3">
+            {latestVisit && (
+              <a
+                href="/patient/visits"
+                className="group flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4 transition hover:border-primary/40 hover:bg-card"
+              >
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                    Latest visit
                   </p>
-                  <p className="mt-1 whitespace-pre-wrap break-words text-muted-foreground">
-                    {f.instructions || "Follow-up visit recommended."}
+                  <p className="tabular-nums mt-2 text-base font-semibold text-foreground">
+                    {formatDateOnly(latestVisit.visit_at)}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {latestVisit.clinic_name}
                   </p>
                 </div>
-              ))}
-            </div>
+                <span className="mt-4 text-xs font-medium text-primary group-hover:underline">
+                  View visit →
+                </span>
+              </a>
+            )}
+
+            {latestPrescription && (
+              <a
+                href="/patient/prescriptions"
+                className="group flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4 transition hover:border-primary/40 hover:bg-card"
+              >
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                    Latest prescription
+                  </p>
+                  <p className="tabular-nums mt-2 text-base font-semibold text-foreground">
+                    {formatDateOnly(latestPrescription.prescribed_at)}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {latestPrescription.clinic_name || clinic.name || "Neuro Spine Care Center"}
+                  </p>
+                </div>
+                <span className="mt-4 text-xs font-medium text-primary group-hover:underline">
+                  View prescription →
+                </span>
+              </a>
+            )}
+
+            {hasBalance && (
+              <a
+                href="/patient/billing"
+                className="group flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4 transition hover:border-primary/40 hover:bg-card"
+              >
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                    Outstanding bills
+                  </p>
+                  <p className="tabular-nums mt-2 text-base font-semibold text-foreground">
+                    {money(d.bills.balance)}
+                  </p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {unpaidCount > 0
+                      ? `${unpaidCount} ${unpaidCount === 1 ? "invoice unpaid" : "invoices unpaid"}`
+                      : "1 invoice unpaid"}
+                  </p>
+                </div>
+                <span className="mt-4 text-xs font-medium text-primary group-hover:underline">
+                  View invoice →
+                </span>
+              </a>
+            )}
           </div>
-        )}
-      </div>
-      {!hasCareData && (
-        <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
-          Your care summary will appear here after your first appointment or clinic visit.
-        </p>
+        </div>
       )}
+      {scopedFollowups.map((f) => {
+        const statusLabel =
+          f.status === "pending"
+            ? "Pending"
+            : f.status.replaceAll("_", " ").replace(/^\w/, (ch) => ch.toUpperCase());
+        return (
+          <div key={f.id} className="surface p-5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold text-foreground">Follow-up recommendation</h3>
+              <span className="inline-flex items-center rounded-full border border-warning/30 bg-warning-soft px-2.5 py-0.5 text-xs font-semibold text-warning">
+                {statusLabel}
+              </span>
+            </div>
+            <p className="tabular-nums mt-2 text-xs text-muted-foreground">
+              {formatDateOnly(String(f.follow_up_date).slice(0, 10))} · {f.clinic_name}
+            </p>
+            <p className="mt-2 whitespace-pre-wrap break-words text-sm text-foreground/90">
+              {f.instructions || "Follow-up visit recommended."}
+            </p>
+          </div>
+        );
+      })}
     </section>
   );
 }

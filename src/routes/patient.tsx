@@ -9,14 +9,10 @@ import {
   Activity,
   ChevronDown,
   ClipboardList,
-  Clock,
   History,
   Home,
   LogOut,
-  Mail,
-  MapPin,
   Menu,
-  Phone,
   Pill,
   Receipt,
   ShieldCheck,
@@ -36,6 +32,12 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -49,7 +51,7 @@ import type { PrintBrandingData } from "@/types/clinical-workflow";
 
 export const Route = createFileRoute("/patient")({ component: PatientLayout });
 
-const navLinks = [
+const primaryNavLinks = [
   { to: "/patient/dashboard", label: "Home", icon: Home, prefetch: "/patient/summary" },
   { to: "/patient/live-queue", label: "Live queue", icon: Activity, prefetch: "" },
   {
@@ -58,6 +60,9 @@ const navLinks = [
     icon: Ticket,
     prefetch: "/patient/appointments",
   },
+] as const;
+
+const recordLinks = [
   { to: "/patient/visits", label: "My visits", icon: ClipboardList, prefetch: "/patient/visits" },
   {
     to: "/patient/prescriptions",
@@ -66,8 +71,10 @@ const navLinks = [
     prefetch: "/patient/prescriptions",
   },
   { to: "/patient/billing", label: "Billing", icon: Receipt, prefetch: "/billing/invoices?clinicId=all" },
-  { to: "/patient/history", label: "History", icon: History, prefetch: "" },
+  { to: "/patient/history", label: "Visit history", icon: History, prefetch: "" },
 ] as const;
+
+const allMobileNavLinks = [...primaryNavLinks, ...recordLinks] as const;
 
 const QUEUE_BOUNDARY_PATHS = new Set([
   "/patient/dashboard",
@@ -94,143 +101,285 @@ function formatFooterTime(value?: string) {
   return `${h % 12 || 12}:${minute} ${h >= 12 ? "PM" : "AM"}`;
 }
 
+type HelpTopic = "contact" | "faqs" | "privacy" | "terms";
+
 function PatientFooter() {
   const { clinics, selected } = useClinicContext();
   const activeClinic = clinics.find((c) => c.id === selected) ?? clinics[0];
   const branding = useClinicalData<PrintBrandingData>(
     selected ? "/branding?clinicId=" + encodeURIComponent(selected) : null,
   );
-  const clinicName =
-    branding.data?.clinic?.display_name || activeClinic?.name || "Neuro Spine Care Center";
+  const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
+
+  const brandName = branding.data?.clinic?.display_name || "Neuro Spine Care Center";
+  const clinicName = activeClinic?.name || brandName;
   const clinicAddress = activeClinic?.address || "";
   const clinicPhone = activeClinic?.phone || branding.data?.doctor?.phone || "";
   const clinicEmail = branding.data?.clinic?.email || branding.data?.doctor?.email || "";
-  const opening = formatFooterTime(activeClinic?.openingTime);
-  const closing = formatFooterTime(activeClinic?.closingTime);
-  const locationParts = [activeClinic?.area, activeClinic?.city].filter(Boolean).join(" · ");
-  const displayUrl = "/public-display?clinicId=" + encodeURIComponent(selected || "northstar");
+  const opening = formatFooterTime(activeClinic?.openingTime) || "9:00 AM";
+  const closing = formatFooterTime(activeClinic?.closingTime) || "5:00 PM";
+  const locationParts = [activeClinic?.area, activeClinic?.city].filter(Boolean).join(", ");
+  const addressDisplay =
+    [clinicAddress, locationParts].filter(Boolean).join(", ") || "Clinic address at reception";
+  const mapsQuery = encodeURIComponent([clinicName, clinicAddress, locationParts].filter(Boolean).join(", "));
+  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
   return (
-    <footer className="mt-14 border-t border-border bg-card/80 print:hidden">
-      <div className="mx-auto max-w-7xl px-5 py-10">
-        <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Column 1: Clinic Identity & Hours */}
-          <div className="min-w-0 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">{clinicName}</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {activeClinic?.department
-                ? `${activeClinic.department}${activeClinic.doctorName ? " · " + activeClinic.doctorName : ""}`
-                : "Outpatient queue tracking, scheduled consultations, and patient care portal."}
-            </p>
-            {(opening || closing) && (
-              <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                <Clock className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="tabular-nums">
-                  Clinic hours: {opening || "09:00 AM"} – {closing || "05:00 PM"}
-                </span>
-              </div>
-            )}
-          </div>
-
-          {/* Column 2: Address & Contact Details */}
-          <div className="min-w-0 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Contact &amp; Location</h2>
-            <div className="space-y-2.5 text-sm text-muted-foreground">
-              <div className="flex items-start gap-2.5">
-                <MapPin className="mt-0.5 size-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="break-words">
-                  {clinicAddress || "Clinic address available at reception"}
-                  {locationParts ? ` (${locationParts})` : ""}
-                </span>
-              </div>
+    <>
+      <footer className="mt-14 bg-[#0d4633] text-emerald-50/90 print:hidden">
+        <div className="mx-auto max-w-7xl px-5 py-11">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.35fr_1fr_1fr_1fr]">
+            {/* Column 1: Clinic Identity & Directions */}
+            <div className="min-w-0 space-y-2.5 text-sm">
               <div className="flex items-center gap-2.5">
-                <Phone className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                {clinicPhone ? (
-                  <a
-                    href={`tel:${clinicPhone.replace(/[^+\d]/g, "")}`}
-                    className="tabular-nums hover:text-foreground hover:underline"
+                <div className="grid size-7 shrink-0 place-items-center rounded-md bg-white text-[#0d4633]">
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="size-4"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.6"
+                    strokeLinecap="round"
                   >
-                    {clinicPhone}
-                  </a>
-                ) : (
-                  <span>Phone listed at clinic reception</span>
-                )}
-              </div>
-              {clinicEmail && (
-                <div className="flex items-center gap-2.5">
-                  <Mail className="size-4 shrink-0 text-primary" aria-hidden="true" />
-                  <a
-                    href={`mailto:${clinicEmail}`}
-                    className="truncate hover:text-foreground hover:underline"
-                  >
-                    {clinicEmail}
-                  </a>
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
                 </div>
-              )}
+                <span className="text-[15px] font-semibold tracking-tight text-white">
+                  {brandName}
+                </span>
+              </div>
+
+              <div className="space-y-1 pt-1 text-xs leading-relaxed text-emerald-100/80">
+                {clinicName !== brandName && <p className="font-medium text-white">{clinicName}</p>}
+                <p className="break-words">{addressDisplay}</p>
+                {clinicPhone && (
+                  <p>
+                    <a
+                      href={`tel:${clinicPhone.replace(/[^+\d]/g, "")}`}
+                      className="tabular-nums hover:text-white hover:underline"
+                    >
+                      {clinicPhone}
+                    </a>
+                  </p>
+                )}
+                <p className="tabular-nums">
+                  Today · {opening} – {closing}
+                </p>
+              </div>
+
+              <p className="pt-1">
+                <a
+                  href={directionsUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs font-medium text-emerald-200 underline-offset-4 hover:text-white hover:underline"
+                >
+                  Get directions
+                </a>
+              </p>
+            </div>
+
+            {/* Column 2: Quick Links */}
+            <div className="min-w-0 space-y-3">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-200/75">
+                Quick links
+              </h2>
+              <ul className="space-y-2 text-xs text-emerald-100/85">
+                <li>
+                  <Link
+                    to="/patient/appointments"
+                    search={{ book: "1" } as never}
+                    className="hover:text-white hover:underline"
+                  >
+                    Book appointment
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/patient/live-queue" className="hover:text-white hover:underline">
+                    Live queue
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/patient/appointments" className="hover:text-white hover:underline">
+                    My appointments
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/account" className="hover:text-white hover:underline">
+                    Account &amp; security
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 3: My Records */}
+            <div className="min-w-0 space-y-3">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-200/75">
+                My records
+              </h2>
+              <ul className="space-y-2 text-xs text-emerald-100/85">
+                <li>
+                  <Link to="/patient/visits" className="hover:text-white hover:underline">
+                    My visits
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/patient/prescriptions" className="hover:text-white hover:underline">
+                    Prescriptions
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/patient/billing" className="hover:text-white hover:underline">
+                    Billing
+                  </Link>
+                </li>
+                <li>
+                  <Link to="/patient/documents" className="hover:text-white hover:underline">
+                    Medical documents
+                  </Link>
+                </li>
+              </ul>
+            </div>
+
+            {/* Column 4: Help */}
+            <div className="min-w-0 space-y-3">
+              <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-200/75">
+                Help
+              </h2>
+              <ul className="space-y-2 text-xs text-emerald-100/85">
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setHelpTopic("contact")}
+                    className="text-left hover:text-white hover:underline"
+                  >
+                    Contact clinic
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setHelpTopic("faqs")}
+                    className="text-left hover:text-white hover:underline"
+                  >
+                    FAQs
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setHelpTopic("privacy")}
+                    className="text-left hover:text-white hover:underline"
+                  >
+                    Privacy policy
+                  </button>
+                </li>
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => setHelpTopic("terms")}
+                    className="text-left hover:text-white hover:underline"
+                  >
+                    Terms of use
+                  </button>
+                </li>
+              </ul>
             </div>
           </div>
 
-          {/* Column 3: Quick Links (distinct from main top navigation) */}
-          <div className="min-w-0 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Quick Links</h2>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>
-                <Link
-                  to="/patient/appointments"
-                  search={{ book: "1" } as never}
-                  className="hover:text-foreground hover:underline"
-                >
-                  Book new appointment
-                </Link>
-              </li>
-              <li>
-                <Link to="/patient/documents" className="hover:text-foreground hover:underline">
-                  Medical documents
-                </Link>
-              </li>
-              <li>
-                <Link to="/patient/profile" className="hover:text-foreground hover:underline">
-                  My profile &amp; details
-                </Link>
-              </li>
-              <li>
-                <Link to="/account" className="hover:text-foreground hover:underline">
-                  Account &amp; security
-                </Link>
-              </li>
-              <li>
-                <a href={displayUrl} className="hover:text-foreground hover:underline">
-                  Waiting room display
-                </a>
-              </li>
-            </ul>
-          </div>
-
-          {/* Column 4: Patient Resources & Support */}
-          <div className="min-w-0 space-y-3">
-            <h2 className="text-sm font-semibold text-foreground">Patient Support</h2>
-            <ul className="space-y-2 text-xs leading-relaxed text-muted-foreground">
-              <li>Arrive at the clinic when 3 patients remain ahead of your token.</li>
-              <li>
-                To cancel a booking, open your appointment card and select Give up token.
-              </li>
-              <li>All clinic appointment times follow Asia/Karachi (PKT).</li>
-              <li className="text-foreground/80">
-                For medical emergencies, contact emergency services or visit the nearest ER
-                immediately.
-              </li>
-            </ul>
+          <div className="mt-9 flex flex-col justify-between gap-2 border-t border-white/15 pt-5 text-xs text-emerald-200/70 sm:flex-row sm:items-center">
+            <p>
+              &copy; {new Date().getFullYear()} {clinicName}. All rights reserved.
+            </p>
+            <p>All clinic times shown in Asia/Karachi (PKT)</p>
           </div>
         </div>
+      </footer>
 
-        <div className="mt-8 flex flex-col justify-between gap-3 border-t border-border pt-6 text-xs text-muted-foreground sm:flex-row sm:items-center">
-          <p>
-            &copy; {new Date().getFullYear()} {clinicName}. All rights reserved.
-          </p>
-          <p>{locationParts ? `${locationParts} · Patient Care Portal` : "Patient Care Portal"}</p>
-        </div>
-      </div>
-    </footer>
+      <Dialog open={helpTopic !== null} onOpenChange={(open) => !open && setHelpTopic(null)}>
+        <DialogContent className="max-w-md">
+          <DialogTitle>
+            {helpTopic === "contact"
+              ? "Contact clinic"
+              : helpTopic === "faqs"
+                ? "Patient FAQs"
+                : helpTopic === "privacy"
+                  ? "Privacy policy"
+                  : "Terms of use"}
+          </DialogTitle>
+          <DialogDescription>
+            {helpTopic === "contact"
+              ? `Reach ${clinicName} reception during clinic hours.`
+              : helpTopic === "faqs"
+                ? "Helpful answers about appointments, queue tokens, and visits."
+                : helpTopic === "privacy"
+                  ? "How your clinical records and appointment details are safeguarded."
+                  : "Guidelines for booking appointments and using the patient queue portal."}
+          </DialogDescription>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            {helpTopic === "contact" && (
+              <>
+                <p>
+                  <strong className="text-foreground">Clinic:</strong> {clinicName}
+                </p>
+                <p>
+                  <strong className="text-foreground">Address:</strong> {addressDisplay}
+                </p>
+                {clinicPhone && (
+                  <p>
+                    <strong className="text-foreground">Phone:</strong>{" "}
+                    <a
+                      href={`tel:${clinicPhone.replace(/[^+\d]/g, "")}`}
+                      className="text-primary hover:underline"
+                    >
+                      {clinicPhone}
+                    </a>
+                  </p>
+                )}
+                {clinicEmail && (
+                  <p>
+                    <strong className="text-foreground">Email:</strong>{" "}
+                    <a href={`mailto:${clinicEmail}`} className="text-primary hover:underline">
+                      {clinicEmail}
+                    </a>
+                  </p>
+                )}
+                <p>
+                  <strong className="text-foreground">Hours:</strong> {opening} – {closing}
+                </p>
+              </>
+            )}
+            {helpTopic === "faqs" && (
+              <ul className="list-disc space-y-2 pl-5">
+                <li>
+                  Your token becomes active in the live queue on the day of your appointment.
+                </li>
+                <li>
+                  Arrive at the waiting room when 3 patients remain ahead of your token.
+                </li>
+                <li>
+                  To cancel an upcoming slot, open your appointment card and choose Give up token.
+                </li>
+              </ul>
+            )}
+            {helpTopic === "privacy" && (
+              <p>
+                Appointment bookings, prescriptions, and visit summaries are visible only to you and
+                authorized clinic care staff. Never share your account password or active session
+                links.
+              </p>
+            )}
+            {helpTopic === "terms" && (
+              <p>
+                Please arrive on time when your token approaches the front of the queue. For
+                medical emergencies, contact emergency services or visit the nearest emergency
+                department immediately.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -250,6 +399,7 @@ function PatientLayoutContent() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const normalizedPath = pathname.replace(/\/$/, "") || "/patient/dashboard";
   const needsQueueBoundary = QUEUE_BOUNDARY_PATHS.has(normalizedPath);
+  const recordsActive = recordLinks.some((r) => normalizedPath.startsWith(r.to));
 
   const prefetchNav = (to: string, prefetchPath: string) => {
     if (to === "/patient/billing") {
@@ -272,50 +422,74 @@ function PatientLayoutContent() {
   return (
     <div className="flex min-h-screen flex-col overflow-x-clip bg-background">
       {/* Single Primary Navigation Bar */}
-      <header className="sticky top-0 z-30 border-b border-border bg-background/95 backdrop-blur print:hidden">
+      <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur print:hidden">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5">
-          <div className="flex min-w-0 items-center gap-5">
+          <div className="flex min-w-0 items-center gap-6">
             <Link to="/patient/dashboard" className="min-w-0 shrink-0">
               <Logo />
             </Link>
 
             <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
-              {navLinks.map((l) => (
+              {primaryNavLinks.map((l) => (
                 <Link
                   key={l.to}
                   to={l.to}
                   onMouseEnter={() => prefetchNav(l.to, l.prefetch)}
                   onFocus={() => prefetchNav(l.to, l.prefetch)}
-                  className="shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-sm text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
-                  activeProps={{ className: "!text-primary !bg-primary-soft font-semibold" }}
+                  className="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
+                  activeProps={{ className: "!bg-primary-soft !text-primary font-semibold" }}
                 >
                   {l.label}
                 </Link>
               ))}
+
+              <DropdownMenu modal={false}>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                      recordsActive
+                        ? "bg-primary-soft font-semibold text-primary"
+                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
+                    }`}
+                  >
+                    My records
+                    <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-48 rounded-xl p-1.5">
+                  {recordLinks.map((r) => (
+                    <DropdownMenuItem key={r.to} asChild>
+                      <Link
+                        to={r.to}
+                        onMouseEnter={() => prefetchNav(r.to, r.prefetch)}
+                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm"
+                      >
+                        <r.icon className="size-4 text-muted-foreground" aria-hidden="true" />
+                        {r.label}
+                      </Link>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </nav>
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-2.5">
-            <div className="hidden max-w-44 sm:block md:max-w-52">
+            <div className="hidden max-w-48 sm:block md:max-w-56">
               <ClinicSwitcher />
             </div>
 
             <Notifications role="patient" />
 
-            <DropdownMenu>
+            <DropdownMenu modal={false}>
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   aria-label="Profile menu"
-                  className="inline-flex h-10 max-w-48 items-center gap-2 rounded-lg border border-border bg-card px-2.5 text-sm font-medium text-foreground transition hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 >
-                  <span className="grid size-6 shrink-0 place-items-center rounded-full bg-primary-soft text-xs font-semibold text-primary">
-                    {initialsOf(profile?.fullName)}
-                  </span>
-                  <span className="hidden truncate sm:inline">
-                    {profile?.fullName?.split(" ")[0] || "Account"}
-                  </span>
-                  <ChevronDown className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  {initialsOf(profile?.fullName)}
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64 rounded-xl p-1.5">
@@ -383,7 +557,7 @@ function PatientLayoutContent() {
               <ClinicSwitcher />
             </div>
             <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {navLinks.map((l) => (
+              {allMobileNavLinks.map((l) => (
                 <Link
                   key={l.to}
                   to={l.to}
@@ -424,7 +598,7 @@ function PatientLayoutContent() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-5 py-6 md:py-10"
+        className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-5 py-6 md:py-9"
       >
         {needsQueueBoundary ? (
           <QueueBoundary kind={pathname.includes("history") ? "list" : "hero"}>

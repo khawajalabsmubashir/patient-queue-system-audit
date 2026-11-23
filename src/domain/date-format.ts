@@ -119,6 +119,45 @@ export function formatDateTime(value?: string | number | Date | null): string {
 /**
  * Full verbose date/time with seconds for hover tooltips.
  */
+/**
+ * Long weekday + full date for hero greeting: "Thursday, 19 November 2026"
+ */
+export function formatLongGreetingDate(value: string | number | Date = new Date()): string {
+  const d = parseDateValue(value);
+  if (!d) return String(value);
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: CLINIC_TIME_ZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(d);
+}
+
+/**
+ * Weekday + short day & month for activation hints: "Thursday" / "19 Nov"
+ */
+export function formatWeekdayName(value?: string | number | Date | null): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = parseDateValue(value);
+  if (!d) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: CLINIC_TIME_ZONE,
+    weekday: "long",
+  }).format(d);
+}
+
+export function formatDayMonth(value?: string | number | Date | null): string {
+  if (value === null || value === undefined || value === "") return "";
+  const d = parseDateValue(value);
+  if (!d) return "";
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: CLINIC_TIME_ZONE,
+    day: "numeric",
+    month: "short",
+  }).format(d);
+}
+
 export function formatFullDateTimeTooltip(value?: string | number | Date | null): string {
   if (value === null || value === undefined || value === "") return "";
   const d = parseDateValue(value);

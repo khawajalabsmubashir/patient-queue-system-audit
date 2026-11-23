@@ -471,9 +471,9 @@ export function finalRoutes(db: Database, notify: Notify) {
         "SELECT e.id,e.clinic_id,e.visit_at,c.name clinic_name FROM encounters e JOIN clinics c ON c.id=e.clinic_id WHERE e.patient_id=? AND e.status='completed' ORDER BY e.visit_at DESC LIMIT 10",
         id,
       ),
-      many<{ id: string; visit_id: string; clinic_id: string; prescribed_at: string }>(
+      many<{ id: string; visit_id: string; clinic_id: string; clinic_name: string; prescribed_at: string }>(
         db,
-        "SELECT p.id,e.id visit_id,e.clinic_id,p.prescribed_at FROM prescriptions p JOIN encounters e ON e.id=p.encounter_id WHERE e.patient_id=? AND e.status='completed' ORDER BY p.prescribed_at DESC LIMIT 10",
+        "SELECT p.id,e.id visit_id,e.clinic_id,c.name clinic_name,p.prescribed_at FROM prescriptions p JOIN encounters e ON e.id=p.encounter_id JOIN clinics c ON c.id=e.clinic_id WHERE e.patient_id=? AND e.status='completed' ORDER BY p.prescribed_at DESC LIMIT 10",
         id,
       ),
       many(
@@ -483,7 +483,7 @@ export function finalRoutes(db: Database, notify: Notify) {
       ),
       one(
         db,
-        "SELECT COALESCE(SUM(balance),0) balance FROM invoices WHERE patient_id=? AND status IN ('unpaid','partially_paid')",
+        "SELECT COALESCE(SUM(balance),0) balance, COUNT(*) unpaid_count FROM invoices WHERE patient_id=? AND status IN ('unpaid','partially_paid')",
         id,
       ),
       many(

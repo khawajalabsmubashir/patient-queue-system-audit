@@ -228,3 +228,53 @@ it("BUG-24: notification bell groups by Today/Yesterday/Older, filters tabs, sho
   expect(screen.getByText("Bill yesterday")).toBeVisible();
   expect(screen.queryByText("Booked today")).toBeNull();
 });
+
+it("BUG-031: mobile viewport renders compact notification bottom sheet with explicit close button and pinned header", async () => {
+  const originalMatchMedia = window.matchMedia;
+  Object.defineProperty(window, "matchMedia", {
+    configurable: true,
+    writable: true,
+    value: (query: string) => ({
+      matches: query.includes("639px"),
+      media: query,
+      onchange: null,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+      dispatchEvent: vi.fn(),
+    }),
+  });
+  try {
+    fixture.api.mockResolvedValue([
+      {
+        id: "n-mob-1",
+        type: "appointment.booked",
+        title: "Appointment confirmed",
+        message: "See you at 10:45 AM.",
+        entity_type: "appointment",
+        entity_id: "a1",
+        clinic_id: "northstar",
+        read_at: null,
+        created_at: new Date().toISOString(),
+      },
+    ]);
+    render(<NotificationCenter />);
+    const bell = await screen.findByRole("button", { name: "Notifications" });
+    fireEvent.click(bell);
+    const sheet = await screen.findByRole("dialog", { name: "Notifications" });
+    expect(sheet).toBeVisible();
+    expect(sheet.className).toContain("max-h-[65dvh]");
+    const closeBtn = screen.getByRole("button", { name: "Close notifications" });
+    expect(closeBtn).toBeVisible();
+    expect(sheet.querySelector(".thin-scrollbar")).not.toBeNull();
+    fireEvent.click(closeBtn);
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Notifications" })).toBeNull());
+  } finally {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      writable: true,
+      value: originalMatchMedia,
+    });
+  }
+});

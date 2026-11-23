@@ -137,9 +137,9 @@
     border-color: var(--color-border);
   }
 
-  html,
-  body {
+  html {
     overflow-x: clip;
+    scrollbar-gutter: stable;
   }
   body {
     background-color: var(--color-background);
@@ -344,4 +344,24 @@ main { min-width: 0; }
   body.printing-prescription .prescription-sheet tbody tr:hover {
     background: transparent;
   }
+}
+
+.thin-scrollbar {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: oklch(0.75 0.012 180) transparent;
+}
+.thin-scrollbar::-webkit-scrollbar {
+  width: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin-block: 6px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb {
+  background-color: oklch(0.78 0.012 180);
+  border-radius: 9999px;
+}
+.thin-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: oklch(0.62 0.02 180);
 }

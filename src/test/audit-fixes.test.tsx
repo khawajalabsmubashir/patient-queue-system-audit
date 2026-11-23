@@ -141,6 +141,9 @@ import { AccountSettings } from "@/components/final-operations";
 import { Route as AdminRoute } from "@/routes/admin";
 import { Route as StaffRoute } from "@/routes/staff";
 import { Route as PatientRoute } from "@/routes/patient";
+import { Route as DashboardRoute } from "@/routes/patient.dashboard";
+import { BillingWorkspace } from "@/components/billing-workspace";
+import { SelectField } from "@/components/form-controls";
 import { validatePassword, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
 import { formatDateOnly, formatDateTime } from "@/domain/date-format";
 
@@ -305,9 +308,17 @@ describe("Audit fixes verification", () => {
     expect(screen.queryByRole("navigation", { name: "Patient records" })).toBeNull();
     const mainNav = screen.getByRole("navigation", { name: "Main navigation" });
     expect(within(mainNav).getByText("Home")).toBeVisible();
-    expect(within(mainNav).getByText("My visits")).toBeVisible();
+    expect(within(mainNav).getByText("Live queue")).toBeVisible();
     expect(within(mainNav).getByText("Appointments")).toBeVisible();
-    expect(within(mainNav).getByText("Billing")).toBeVisible();
+    const recordsTrigger = within(mainNav).getByRole("button", { name: /My records/i });
+    expect(recordsTrigger).toBeVisible();
+    fireEvent.keyDown(recordsTrigger, { key: "Enter", code: "Enter" });
+    expect(await screen.findByRole("menuitem", { name: /My visits/i })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /Prescriptions/i })).toBeVisible();
+    expect(screen.getByRole("menuitem", { name: /Billing/i })).toBeVisible();
+    expect(document.body.style.overflow).toBe("");
+    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+    fireEvent.keyDown(recordsTrigger, { key: "Escape" });
 
     // Sign Out & Account & security are NOT separate standalone navbar links/buttons
     const header = document.querySelector("header")!;
@@ -318,19 +329,26 @@ describe("Audit fixes verification", () => {
     expect(screen.queryByTestId("queue-boundary")).toBeNull();
     expect(screen.getByTestId("route-outlet")).toBeVisible();
 
-    // Footer includes clinic details, non-duplicating quick links, support & copyright
+    // PDF-matched dark emerald Footer includes clinic identity, Quick links, My records, Help + interactive FAQ modal
     const footer = document.querySelector("footer")!;
+    expect(footer.className).toContain("bg-[#0d4633]");
     expect(footer).toHaveTextContent("Health Point");
     expect(footer).toHaveTextContent("Plot 12, Clifton Block 5");
     expect(footer).toHaveTextContent("03001112233");
     expect(footer).toHaveTextContent(/All rights reserved/i);
+    expect(within(footer).getByRole("link", { name: /Get directions/i })).toBeVisible();
     expect(within(footer).getByRole("link", { name: /Medical documents/i })).toBeVisible();
-    expect(within(footer).queryByRole("link", { name: /^Live queue$/i })).toBeNull();
+    expect(within(footer).getByRole("link", { name: /^Live queue$/i })).toBeVisible();
+    fireEvent.click(within(footer).getByRole("button", { name: "FAQs" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/Patient FAQs/i);
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
 
-    // Profile dropdown includes My profile, Account & security, and Sign Out -> confirmation prompt
+    // Profile dropdown includes My profile, Account & security, and Sign Out -> confirmation prompt without scroll-lock
     const profileTrigger = within(header).getByRole("button", { name: "Profile menu" });
     fireEvent.keyDown(profileTrigger, { key: "Enter", code: "Enter" });
     expect(await screen.findByRole("menuitem", { name: /My profile/i })).toBeVisible();
+    expect(document.body.style.overflow).toBe("");
+    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
     expect(screen.getByRole("menuitem", { name: /Account & security/i })).toHaveAttribute(
       "href",
       "/account",
@@ -659,7 +677,7 @@ describe("Audit fixes verification", () => {
     cleanup();
 
     render(<PatientSummary />);
-    expect(await screen.findByText("Your care summary")).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Care summary" })).toBeVisible();
     expect(screen.getByText("Scheduled")).toBeVisible();
     // Task 7: Recent notifications section is completely removed from Home Page
     expect(screen.queryByText(/Recent notifications/i)).toBeNull();
@@ -823,5 +841,97 @@ describe("Audit fixes verification", () => {
     render(<PatientSummary />);
     expect(await screen.findByText(/18 Nov 2030, 10:30 AM · Health Point/)).toBeVisible();
     expect(screen.queryByText(/Northstar Medical Clinic/)).toBeNull();
+  });
+
+  it("BUG-27, BUG-029 & BUG-034: Dashboard removes repeated quick-action links, renders PDF layout & places Live queue first on mobile", async () => {
+    mocks.api.mockImplementation((path: string) => {
+      if (path.includes("/patient/appointments")) {
+        return Promise.resolve([
+          {
+            id: "appt-next",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            scheduledAt: "2030-11-19T10:45",
+            status: "confirmed",
+            token: { id: "tok-1", tokenCode: "HP-001", status: "waiting" },
+          },
+          {
+            id: "appt-later",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            scheduledAt: "2030-11-20T11:45",
+            status: "scheduled",
+            token: { id: "tok-2", tokenCode: "HP-002", status: "waiting" },
+          },
+        ]);
+      }
+      if (path.includes("/patient/summary")) {
+        return Promise.resolve({
+          appointment: { id: "appt-next", clinic_id: "clinic", scheduled_at: "2030-11-19T10:45", clinic_name: "Health Point", status: "confirmed" },
+          visit: { clinic_id: "clinic", visit_at: "2026-11-16T09:00:00Z", clinic_name: "Health Point" },
+          prescription: { clinic_id: "clinic", prescribed_at: "2026-11-16T09:00:00Z", clinic_name: "Health Point" },
+          document: null,
+          bills: { balance: 25000, unpaid_count: 1 },
+          followups: [
+            {
+              id: "fu-1",
+              clinic_id: "clinic",
+              follow_up_date: "2026-11-10",
+              clinic_name: "Health Point",
+              instructions: "Take proper rest and medicine on time.",
+              status: "pending",
+            },
+          ],
+          notifications: [],
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    const DashboardComponent = DashboardRoute.options.component!;
+    render(<DashboardComponent />);
+
+    expect(await screen.findByText(/Good morning, Dr\./)).toBeVisible();
+    // BUG-27: Repeated 4-card Quick actions navigation strip is removed
+    expect(screen.queryByRole("region", { name: "Quick actions" })).toBeNull();
+    // Next appointment + LATER + color-coded badges
+    expect(await screen.findByText("HP-001")).toBeVisible();
+    expect(screen.getByText("Confirmed")).toBeVisible();
+    expect(screen.getByText("Scheduled")).toBeVisible();
+    // Care summary 3 cards + Follow-up Pending pill
+    expect(await screen.findByRole("heading", { name: "Care summary" })).toBeVisible();
+    expect(screen.getByText("1 invoice unpaid")).toBeVisible();
+    expect(screen.getByText("Pending")).toBeVisible();
+    // BUG-034: Live queue card uses order-first on mobile and Before you arrive renders numbered steps
+    const liveQueueRegion = screen.getByRole("heading", { name: "Live queue" }).closest("section")!;
+    expect(liveQueueRegion.className).toContain("order-first");
+    expect(liveQueueRegion.className).toContain("lg:order-none");
+    expect(screen.getByText("Before you arrive")).toBeVisible();
+  });
+
+  it("BUG-033: Billing search includes helpful placeholder text and aligns with Status filter", async () => {
+    mocks.api.mockResolvedValue([]);
+    render(<BillingWorkspace portal />);
+    const searchInput = await screen.findByPlaceholderText("Search invoices or patients");
+    expect(searchInput).toBeVisible();
+    const row = searchInput.closest(".flex.flex-wrap")!;
+    expect(row.className).toContain("items-end");
+  });
+
+  it("BUG-035: Non-modal SelectField listbox opens without scroll-locking document.body or freezing pointer events", async () => {
+    render(
+      <SelectField aria-label="Clinic selector" defaultValue="clinic">
+        <option value="clinic">Health Point</option>
+        <option value="northstar">Northstar Medical Clinic</option>
+      </SelectField>,
+    );
+    const trigger = screen.getByRole("combobox", { name: "Clinic selector" });
+    fireEvent.click(trigger);
+    expect(await screen.findByRole("option", { name: "Northstar Medical Clinic" })).toBeVisible();
+    expect(document.body.style.overflow).toBe("");
+    expect(document.body.style.pointerEvents).toBe("");
+    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+    fireEvent.click(screen.getByRole("option", { name: "Northstar Medical Clinic" }));
+    expect(trigger).toHaveTextContent("Northstar Medical Clinic");
   });
 });

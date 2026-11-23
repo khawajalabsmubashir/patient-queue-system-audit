@@ -1,12 +1,5 @@
 import * as React from "react";
-import { CalendarDays, Clock } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { CalendarDays, Check, ChevronDown, Clock } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
@@ -37,7 +30,7 @@ function textOf(children: React.ReactNode): string {
 }
 
 /** Native backing field preserves FormData, required validation and change handlers.
- * Only the shadcn trigger/menu is visible or keyboard-focusable. */
+ * Uses a non-modal Popover listbox (no RemoveScroll body lock or horizontal layout shift). */
 export function SelectField({
   children,
   className,
@@ -52,60 +45,103 @@ export function SelectField({
     String(option.props.value ?? textOf(option.props.children));
   const initial = String(defaultValue ?? (options[0] ? optionValue(options[0]) : ""));
   const [local, setLocal] = React.useState(initial);
+  const [open, setOpen] = React.useState(false);
+  const [dialogContainer, setDialogContainer] = React.useState<HTMLElement | null>(null);
   const selected = String(value ?? local);
   const backing = React.useRef<HTMLSelectElement>(null);
   const trigger = React.useRef<HTMLButtonElement>(null);
+
   React.useEffect(() => {
     const form = backing.current?.form;
     const reset = () => setLocal(initial);
     form?.addEventListener("reset", reset);
     return () => form?.removeEventListener("reset", reset);
   }, [initial]);
+
+  React.useLayoutEffect(() => {
+    if (!open || !trigger.current) return;
+    const dialog = trigger.current.closest<HTMLElement>("[role='dialog']");
+    setDialogContainer(dialog);
+  }, [open]);
+
+  const activeOption = options.find((option) => optionValue(option) === selected) ?? options[0];
+  const displayLabel = activeOption ? textOf(activeOption.props.children) : "";
+
+  const commit = (nextValue: string) => {
+    setOpen(false);
+    if (backing.current) {
+      backing.current.value = nextValue;
+      backing.current.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    trigger.current?.focus();
+  };
+
   return (
     <>
-      <Select
-        value={selected || emptyOption}
-        disabled={!!props.disabled}
-        onValueChange={(next) => {
-          // Radix's form backing can emit an empty value on mount. User-cleared
-          // selections use our explicit emptyOption item instead.
-          if (!next) return;
-          const nextValue = next === emptyOption ? "" : next;
-          if (backing.current) {
-            backing.current.value = nextValue;
-            backing.current.dispatchEvent(new Event("change", { bubbles: true }));
-          }
-        }}
-      >
-        <SelectTrigger
-          ref={trigger}
-          id={id}
-          aria-label={props["aria-label"]}
-          aria-labelledby={props["aria-labelledby"]}
-          aria-describedby={props["aria-describedby"]}
-          aria-invalid={props["aria-invalid"]}
-          aria-required={props.required}
-          className={cn(
-            fieldClass,
-            "inline-flex w-auto max-w-full min-w-0 gap-3 text-start",
-            className?.replace(/\bblock\b/g, "flex"),
-          )}
+      <Popover open={open} onOpenChange={(next) => !props.disabled && setOpen(next)}>
+        <PopoverTrigger asChild>
+          <button
+            ref={trigger}
+            type="button"
+            role="combobox"
+            id={id}
+            disabled={!!props.disabled}
+            aria-expanded={open}
+            aria-haspopup="listbox"
+            aria-label={props["aria-label"]}
+            aria-labelledby={props["aria-labelledby"]}
+            aria-describedby={props["aria-describedby"]}
+            aria-invalid={props["aria-invalid"]}
+            aria-required={props.required}
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+                e.preventDefault();
+                if (!props.disabled) setOpen(true);
+              }
+            }}
+            className={cn(
+              fieldClass,
+              "inline-flex w-auto max-w-full min-w-0 cursor-pointer items-center justify-between gap-2.5 text-start whitespace-nowrap",
+              className?.replace(/\bblock\b/g, "flex"),
+            )}
+          >
+            <span className="min-w-0 truncate">{displayLabel}</span>
+            <ChevronDown className="size-4 shrink-0 text-muted-foreground opacity-70" aria-hidden="true" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          align="start"
+          container={dialogContainer}
+          {...(dialogContainer ? { collisionBoundary: dialogContainer } : {})}
+          collisionPadding={10}
+          className="thin-scrollbar max-h-64 w-auto min-w-[max(var(--radix-popover-trigger-width),10rem)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-md"
+          onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent className="max-w-[calc(100vw-2rem)] rounded-lg bg-card shadow-md">
-          {options.map((option) => (
-            <SelectItem
-              key={optionValue(option)}
-              value={optionValue(option) || emptyOption}
-              disabled={!!option.props.disabled}
-              className="min-h-10 rounded-md data-[state=checked]:bg-primary/10 data-[state=checked]:text-primary focus:bg-accent focus:text-accent-foreground"
-            >
-              {option.props.children}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+          <div role="listbox" aria-label={props["aria-label"] ?? "Options"} className="flex flex-col gap-0.5">
+            {options.map((option) => {
+              const val = optionValue(option);
+              const isSelected = val === selected;
+              return (
+                <button
+                  key={val || emptyOption}
+                  type="button"
+                  role="option"
+                  aria-selected={isSelected}
+                  disabled={!!option.props.disabled}
+                  onClick={() => commit(val)}
+                  className={cn(
+                    "relative flex min-h-9 w-full cursor-pointer select-none items-center justify-between gap-3 rounded-md px-2.5 py-1.5 text-left text-sm transition outline-none hover:bg-accent hover:text-accent-foreground focus-visible:bg-accent focus-visible:text-accent-foreground disabled:pointer-events-none disabled:opacity-50",
+                    isSelected && "bg-primary/10 font-medium text-primary",
+                  )}
+                >
+                  <span className="truncate">{option.props.children}</span>
+                  {isSelected && <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />}
+                </button>
+              );
+            })}
+          </div>
+        </PopoverContent>
+      </Popover>
       <select
         {...props}
         ref={backing}
