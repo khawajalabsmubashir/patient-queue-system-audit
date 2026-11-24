@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   Bell,
   CalendarCheck,
@@ -193,22 +194,35 @@ export function NotificationCenter() {
     return groups;
   }, [items, filter, todayKey, yesterdayKey]);
 
+  useEffect(() => {
+    if (!isMobile || !open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isMobile, open]);
+
   const unreadCount = items.filter((n) => !n.read_at).length;
 
   const panelBody = (
     <>
       <div className="shrink-0 border-b border-border px-4 pb-3 pt-3.5">
         <div className="mb-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <h2 className="font-semibold text-foreground">Notifications</h2>
+          <div className="flex min-w-0 items-center gap-2">
+            <h2 className="truncate font-semibold text-foreground">Notifications</h2>
             {unreadCount > 0 && (
-              <span className="rounded-md bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary tabular">
+              <span className="shrink-0 whitespace-nowrap rounded-md bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary tabular">
                 {unreadCount} new
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
-            <Btn variant="ghost" className="h-8 px-2.5 text-xs" onClick={() => void read()}>
+          <div className="flex shrink-0 items-center gap-1">
+            <Btn
+              variant="ghost"
+              className="h-8 shrink-0 whitespace-nowrap px-2.5 text-xs"
+              onClick={() => void read()}
+            >
               Mark all read
             </Btn>
             <button
@@ -375,28 +389,33 @@ export function NotificationCenter() {
   );
 
   if (isMobile) {
+    const mobileOverlay = open ? (
+      <div className="fixed inset-0 z-50 flex flex-col justify-end" role="presentation">
+        <div
+          className="fixed inset-0 bg-black/35 backdrop-blur-[1px]"
+          aria-hidden="true"
+          onClick={() => setOpen(false)}
+        />
+        <section
+          role="dialog"
+          aria-label="Notifications"
+          className="relative z-10 flex max-h-[65dvh] w-full flex-col overflow-hidden rounded-t-2xl border-t border-border bg-card pb-[env(safe-area-inset-bottom)] shadow-2xl"
+        >
+          <div className="flex shrink-0 justify-center pt-2">
+            <span className="h-1 w-10 rounded-full bg-border" aria-hidden="true" />
+          </div>
+          {panelBody}
+        </section>
+      </div>
+    ) : null;
+
     return (
       <>
         {bellTrigger}
-        {open && (
-          <div className="fixed inset-0 z-50 flex flex-col justify-end" role="presentation">
-            <div
-              className="fixed inset-0 bg-black/35 backdrop-blur-[1px]"
-              aria-hidden="true"
-              onClick={() => setOpen(false)}
-            />
-            <section
-              role="dialog"
-              aria-label="Notifications"
-              className="relative z-10 flex max-h-[65dvh] w-full flex-col overflow-hidden rounded-t-2xl border-t border-border bg-card shadow-2xl"
-            >
-              <div className="flex justify-center pt-2">
-                <span className="h-1 w-10 rounded-full bg-border" aria-hidden="true" />
-              </div>
-              {panelBody}
-            </section>
-          </div>
-        )}
+        {mobileOverlay &&
+          (typeof document !== "undefined"
+            ? createPortal(mobileOverlay, document.body)
+            : mobileOverlay)}
       </>
     );
   }
@@ -406,7 +425,9 @@ export function NotificationCenter() {
       <DropdownMenuTrigger asChild>{bellTrigger}</DropdownMenuTrigger>
       <DropdownMenuContent
         align="end"
-        className="flex max-h-[70vh] w-[25rem] max-w-[calc(100vw-2rem)] flex-col overflow-hidden rounded-xl p-0 shadow-lg"
+        sideOffset={8}
+        collisionPadding={12}
+        className="flex max-h-[min(70dvh,32rem)] w-[25rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl p-0 shadow-lg"
       >
         {panelBody}
       </DropdownMenuContent>

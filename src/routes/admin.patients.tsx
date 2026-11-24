@@ -64,7 +64,7 @@ export function Patients() {
         sub="Find a patient, open their record, and start a consultation."
       />
       <div className="mb-5 flex flex-wrap items-end gap-4">
-        <div className="w-full max-w-sm">
+        <div className="min-w-0 w-full max-w-sm">
           <Field
             label="Search patients"
             placeholder="Name, email or phone"
@@ -72,10 +72,11 @@ export function Patients() {
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <label className="text-sm">
-          Clinic
+        <label className="block min-w-0 w-full max-w-full text-sm sm:w-auto">
+          <span className="mb-1.5 block font-medium">Clinic</span>
           <SelectField
             aria-label="Patient clinic"
+            className="w-full sm:w-auto"
             value={clinic}
             onChange={(e) => {
               setClinic(e.target.value);
@@ -90,12 +91,14 @@ export function Patients() {
             ))}
           </SelectField>
         </label>
-        <Field
-          label="Free-text clinical matches"
-          placeholder="Recorded condition or completed diagnosis"
-          value={clinical}
-          onChange={(e) => setClinical(e.target.value)}
-        />
+        <div className="min-w-0 w-full sm:w-auto sm:min-w-[16rem] sm:flex-1 sm:max-w-sm">
+          <Field
+            label="Free-text clinical matches"
+            placeholder="Recorded condition or completed diagnosis"
+            value={clinical}
+            onChange={(e) => setClinical(e.target.value)}
+          />
+        </div>
       </div>
       <section className="mb-5">
         <h2 className="mb-2 text-sm font-semibold">Condition groups</h2>

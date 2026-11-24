@@ -16,6 +16,7 @@ import { logout } from "@/services/auth";
 import { NotificationCenter } from "@/components/notification-center";
 import { AppointmentStatusBadge } from "@/components/appointment-tokens";
 import { formatDateOnly, formatDateTime } from "@/domain/date-format";
+import { Search } from "lucide-react";
 
 type Metrics = {
   patients: number;
@@ -213,7 +214,7 @@ export function OperationalReports({ reports = false }: { reports?: boolean }) {
           </section>
           <div className="grid gap-4 md:grid-cols-2">
             {(["visits", "revenue", "averageWait"] as const).map((metric) => (
-              <section className="surface p-5" key={metric}>
+              <section className="surface min-w-0 p-5" key={metric}>
                 <h2 className="mb-4 font-semibold">
                   {metric === "visits"
                     ? "Patient visits"
@@ -341,8 +342,10 @@ export function GlobalSearch() {
         variant="secondary"
         onClick={() => setOpen(true)}
         aria-label="Search Neuro Spine Care Center (Control K)"
+        className="size-10 shrink-0 px-0 sm:h-10 sm:w-auto sm:px-3.5"
       >
-        Search
+        <Search className="size-4 shrink-0" aria-hidden="true" />
+        <span className="hidden sm:inline">Search</span>
       </Btn>
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent>

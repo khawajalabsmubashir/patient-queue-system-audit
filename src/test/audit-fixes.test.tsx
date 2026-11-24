@@ -934,4 +934,38 @@ describe("Audit fixes verification", () => {
     fireEvent.click(screen.getByRole("option", { name: "Northstar Medical Clinic" }));
     expect(trigger).toHaveTextContent("Northstar Medical Clinic");
   });
+
+  it("Issue 14: Admin header uses Profile dropdown, houses Account & security and Sign Out, and prevents horizontal overflow", async () => {
+    mocks.role = "admin";
+    mocks.logout.mockResolvedValue(undefined);
+    mocks.api.mockResolvedValue([]);
+    const AdminComponent = AdminRoute.options.component!;
+    const { container } = render(<AdminComponent />);
+
+    const layoutRoot = container.firstElementChild as HTMLElement;
+    expect(layoutRoot.className).toContain("overflow-x-clip");
+    expect(layoutRoot.className).toContain("max-w-full");
+
+    const mainEl = container.querySelector("main") as HTMLElement;
+    expect(mainEl.className).toContain("min-w-0");
+
+    const header = document.querySelector("header")!;
+    expect(header.className).toContain("max-w-full");
+    expect(within(header).queryByRole("button", { name: /^Logout$/i })).toBeNull();
+    expect(within(header).getByTestId("global-search")).toBeInTheDocument();
+    expect(within(header).getByTestId("notifications")).toBeInTheDocument();
+
+    const profileTrigger = within(header).getByRole("button", { name: "Profile menu" });
+    fireEvent.keyDown(profileTrigger, { key: "Enter", code: "Enter" });
+    const accountItem = await screen.findByRole("menuitem", { name: /Account & security/i });
+    expect(accountItem).toBeVisible();
+    expect(accountItem).toHaveAttribute("href", "/account");
+    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+
+    fireEvent.click(screen.getByRole("menuitem", { name: /Sign Out/i }));
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent(/Are you sure you want to sign out/i);
+    fireEvent.click(within(dialog).getByRole("button", { name: /Yes, Sign Out/i }));
+    await waitFor(() => expect(mocks.logout).toHaveBeenCalledTimes(1));
+  });
 });

@@ -6,7 +6,7 @@ import { logout } from "@/services/auth";
 import { runAction } from "@/services/queue";
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useState } from "react";
-import { History, LayoutGrid, ListOrdered, Monitor, Settings, Users, Menu, LogOut } from "lucide-react";
+import { History, LayoutGrid, ListOrdered, Monitor, Settings, Users, Menu, LogOut, ShieldCheck } from "lucide-react";
 import { Logo, LiveDot } from "@/components/qc";
 import { useQueue } from "@/lib/queue-store";
 import { cn } from "@/lib/utils";
@@ -22,6 +22,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -136,7 +144,7 @@ function AdminLayoutContent() {
     day: "numeric",
   });
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen w-full max-w-full overflow-x-clip">
       <aside className="sticky top-0 hidden h-screen overflow-y-auto w-60 shrink-0 flex-col border-r border-sidebar-border bg-sidebar px-3 py-5 lg:flex">
         <Logo className="px-2" />
         <AdminNavigation />
@@ -177,47 +185,88 @@ function AdminLayoutContent() {
         </SheetContent>
       </Sheet>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border bg-background/85 px-4 backdrop-blur md:gap-4 md:px-8">
-          <button
-            aria-label="Open navigation"
-            onClick={() => setMenu(true)}
-            className="grid size-11 shrink-0 place-items-center rounded-lg hover:bg-muted lg:hidden"
-          >
-            <Menu className="size-5" />
-          </button>
-          <Logo className="[&>span]:hidden sm:[&>span]:inline lg:hidden" />
-          <div className="hidden text-sm lg:block">
-            <span className="font-medium">{selected === "all" ? "All Clinics" : clinic.name}</span>
-            <span className="ml-3 text-muted-foreground">{date}</span>
+        <header className="sticky top-0 z-20 flex h-16 w-full max-w-full items-center justify-between gap-2 border-b border-border bg-background/85 px-3 backdrop-blur sm:px-4 md:gap-4 md:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-3">
+            <button
+              type="button"
+              aria-label="Open navigation"
+              onClick={() => setMenu(true)}
+              className="grid size-10 shrink-0 place-items-center rounded-lg hover:bg-muted sm:size-11 lg:hidden"
+            >
+              <Menu className="size-5" />
+            </button>
+            <Logo className="shrink-0 [&>span]:hidden sm:[&>span]:inline lg:hidden" />
+            <div className="hidden min-w-0 shrink-0 text-sm lg:block">
+              <span className="font-medium">{selected === "all" ? "All Clinics" : clinic.name}</span>
+              <span className="ml-3 text-muted-foreground">{date}</span>
+            </div>
+            <div className="min-w-0 flex-1 max-w-[10.5rem] sm:max-w-[13rem]">
+              <ClinicSwitcher all />
+            </div>
           </div>
-          <div className="min-w-0 max-w-40">
-            <ClinicSwitcher all />
+          <div className="flex shrink-0 items-center gap-1.5 sm:gap-2.5">
+            <span
+              className={cn(
+                "hidden md:inline-flex shrink-0 items-center gap-2 rounded-full px-3 py-1 text-xs font-medium",
+                open ? "bg-success-soft text-success" : "bg-muted text-muted-foreground",
+              )}
+            >
+              {open ? <LiveDot /> : <span className="size-2 rounded-full bg-current" />}
+              {open ? "Queue open" : "Queue closed"}
+            </span>
+            <GlobalSearch />
+            <Notifications role="admin" />
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  aria-label="Profile menu"
+                  className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {initials || "AD"}
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64 rounded-xl p-1.5">
+                <DropdownMenuLabel className="px-2.5 py-2">
+                  <p className="truncate text-sm font-semibold text-foreground">
+                    {profile?.fullName || "Administrator"}
+                  </p>
+                  {profile?.email && (
+                    <p className="truncate text-xs font-normal text-muted-foreground">
+                      {profile.email}
+                    </p>
+                  )}
+                  <p className="mt-0.5 text-[11px] font-normal text-muted-foreground">
+                    Doctor / Administrator
+                  </p>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link
+                    to="/account"
+                    onMouseEnter={() => prefetchClinicalData("/account")}
+                    className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm"
+                  >
+                    <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+                    Account &amp; security
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onSelect={() => setConfirmLogout(true)}
+                  className="cursor-pointer rounded-lg px-2.5 py-2 text-sm font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"
+                >
+                  <LogOut className="size-4" aria-hidden="true" />
+                  Sign Out
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
-          <span
-            className={cn(
-              "ml-auto hidden sm:inline-flex shrink-0 items-center gap-2 rounded-full px-2 py-1 text-xs font-medium sm:px-3",
-              open ? "bg-success-soft text-success" : "bg-muted text-muted-foreground",
-            )}
-          >
-            {open ? <LiveDot /> : <span className="size-2 rounded-full bg-current" />}
-            {open ? "Queue open" : "Queue closed"}
-          </span>
-          <GlobalSearch />
-          <Notifications role="admin" />
-          <button
-            type="button"
-            aria-label="Logout"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2.5 py-2 text-sm font-medium hover:bg-muted"
-            onClick={() => setConfirmLogout(true)}
-          >
-            <LogOut className="size-4" />
-            <span>Logout</span>
-          </button>
         </header>
         <main
           id="main-content"
           tabIndex={-1}
-          className="mx-auto w-full max-w-[1240px] flex-1 px-5 py-8 md:px-8 md:py-10"
+          className="mx-auto w-full min-w-0 max-w-[1240px] flex-1 px-4 py-6 sm:px-5 sm:py-8 md:px-8 md:py-10"
         >
           {!["/admin/queue", "/admin/live-queue", "/admin/history"].includes(pathname) ? (
             <Outlet />

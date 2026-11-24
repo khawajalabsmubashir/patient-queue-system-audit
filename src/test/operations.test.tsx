@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { BillingWorkspace } from "@/components/billing-workspace";
 import { DocumentsPanel } from "@/components/documents-panel";
 import { NotificationCenter, notificationHref } from "@/components/notification-center";
+import { GlobalSearch } from "@/components/final-operations";
 import { decimalMinor, money, type AppNotification, type Invoice } from "@/types/operations";
 const fixture = vi.hoisted(() => ({ api: vi.fn(), role: "patient" }));
 vi.mock("@/api/client", () => ({ api: fixture.api }));
@@ -259,12 +260,22 @@ it("BUG-031: mobile viewport renders compact notification bottom sheet with expl
         created_at: new Date().toISOString(),
       },
     ]);
-    render(<NotificationCenter />);
+    const { container } = render(
+      <header className="sticky top-0 z-20 h-16 backdrop-blur">
+        <NotificationCenter />
+      </header>,
+    );
+    const header = container.querySelector("header")!;
     const bell = await screen.findByRole("button", { name: "Notifications" });
     fireEvent.click(bell);
     const sheet = await screen.findByRole("dialog", { name: "Notifications" });
     expect(sheet).toBeVisible();
+    expect(header.contains(sheet)).toBe(false);
     expect(sheet.className).toContain("max-h-[65dvh]");
+    expect(sheet.parentElement?.parentElement).toBe(document.body);
+    const markAllRead = screen.getByRole("button", { name: "Mark all read" });
+    expect(markAllRead).toBeVisible();
+    expect(markAllRead.className).toContain("whitespace-nowrap");
     const closeBtn = screen.getByRole("button", { name: "Close notifications" });
     expect(closeBtn).toBeVisible();
     expect(sheet.querySelector(".thin-scrollbar")).not.toBeNull();
@@ -277,4 +288,16 @@ it("BUG-031: mobile viewport renders compact notification bottom sheet with expl
       value: originalMatchMedia,
     });
   }
+});
+
+it("Issue 14: GlobalSearch renders compact icon-only trigger below sm breakpoint while preserving desktop Search label", () => {
+  render(<GlobalSearch />);
+  const searchBtn = screen.getByRole("button", {
+    name: "Search Neuro Spine Care Center (Control K)",
+  });
+  expect(searchBtn.className).toContain("size-10");
+  const labelSpan = searchBtn.querySelector("span");
+  expect(labelSpan).not.toBeNull();
+  expect(labelSpan?.textContent).toBe("Search");
+  expect(labelSpan?.className).toContain("hidden sm:inline");
 });

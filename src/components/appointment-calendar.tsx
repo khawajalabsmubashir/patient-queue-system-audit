@@ -388,7 +388,7 @@ export function AppointmentCalendar() {
                     {patientMode === "lookup" && (
                       <div className="space-y-3 rounded-lg border border-border p-3">
                         <div className="flex flex-wrap items-end gap-2">
-                          <div className="min-w-[200px] flex-1">
+                          <div className="min-w-0 w-full sm:min-w-[200px] sm:flex-1">
                             <Field
                               label="Registered patient email"
                               type="email"

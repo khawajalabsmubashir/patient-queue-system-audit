@@ -105,7 +105,7 @@ export function ClinicSwitcher({ all = false }: { all?: boolean }) {
       <span className="sr-only">Current clinic</span>
       <SelectField
         aria-label="Current clinic"
-        className="max-w-full rounded-lg border border-input bg-card px-3 py-2 text-sm font-medium text-foreground outline-none focus:border-primary"
+        className="w-full max-w-full min-w-0 rounded-lg border border-input bg-card px-2.5 py-2 text-sm font-medium text-foreground outline-none focus:border-primary sm:px-3"
         value={c.selected}
         onChange={(e) => c.select(e.target.value)}
       >
