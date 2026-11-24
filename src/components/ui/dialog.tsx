@@ -17,16 +17,34 @@ const DialogClose = DialogPrimitive.Close;
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <DialogPrimitive.Overlay
-    ref={ref}
-    className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className,
-    )}
-    {...props}
-  />
-));
+>(({ className, ...props }, ref) => {
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const next = Number(root.getAttribute("data-modal-lock-count") ?? "0") + 1;
+    root.setAttribute("data-modal-lock-count", String(next));
+    root.classList.add("dialog-scroll-locked");
+    return () => {
+      const remaining = Math.max(0, Number(root.getAttribute("data-modal-lock-count") ?? "1") - 1);
+      if (remaining === 0) {
+        root.removeAttribute("data-modal-lock-count");
+        root.classList.remove("dialog-scroll-locked");
+      } else {
+        root.setAttribute("data-modal-lock-count", String(remaining));
+      }
+    };
+  }, []);
+
+  return (
+    <DialogPrimitive.Overlay
+      ref={ref}
+      className={cn(
+        "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        className,
+      )}
+      {...props}
+    />
+  );
+});
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
 const DialogContent = React.forwardRef<
@@ -66,7 +84,7 @@ const DialogContent = React.forwardRef<
         <div
           data-dialog-body="true"
           className={cn(
-            "relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto",
+            "thin-scrollbar relative flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto",
             isUnpadded ? "p-0" : "p-6",
           )}
         >

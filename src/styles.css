@@ -141,6 +141,18 @@
     overflow-x: clip;
     scrollbar-gutter: stable;
   }
+  html:has(body[data-scroll-locked]),
+  html.dialog-scroll-locked {
+    overflow-y: hidden !important;
+    overscroll-behavior-y: none;
+  }
+  @supports (scrollbar-gutter: stable) {
+    html:has(body[data-scroll-locked]) body[data-scroll-locked],
+    html.dialog-scroll-locked body[data-scroll-locked] {
+      margin-right: 0 !important;
+      padding-right: 0 !important;
+    }
+  }
   body {
     background-color: var(--color-background);
     color: var(--color-foreground);

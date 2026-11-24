@@ -215,9 +215,6 @@ function Dashboard() {
           >
             <Btn>Book appointment</Btn>
           </Link>
-          <Link to="/patient/live-queue">
-            <Btn variant="secondary">Live queue</Btn>
-          </Link>
         </div>
       </section>
 

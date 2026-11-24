@@ -158,6 +158,8 @@ afterEach(() => {
   mocks.navigate.mockReset();
   mocks.pathname = "/patient/appointments";
   mocks.role = "patient";
+  document.documentElement.classList.remove("dialog-scroll-locked");
+  document.documentElement.removeAttribute("data-modal-lock-count");
 });
 
 describe("Audit fixes verification", () => {
@@ -891,7 +893,11 @@ describe("Audit fixes verification", () => {
     const DashboardComponent = DashboardRoute.options.component!;
     render(<DashboardComponent />);
 
-    expect(await screen.findByText(/Good morning, Dr\./)).toBeVisible();
+    const greeting = await screen.findByText(/Good morning, Dr\./);
+    expect(greeting).toBeVisible();
+    const heroSection = greeting.closest("section")!;
+    expect(within(heroSection).getByRole("button", { name: /Book appointment/i })).toBeVisible();
+    expect(within(heroSection).queryByRole("link", { name: /Live queue/i })).toBeNull();
     // BUG-27: Repeated 4-card Quick actions navigation strip is removed
     expect(screen.queryByRole("region", { name: "Quick actions" })).toBeNull();
     // Next appointment + LATER + color-coded badges
@@ -967,5 +973,39 @@ describe("Audit fixes verification", () => {
     expect(dialog).toHaveTextContent(/Are you sure you want to sign out/i);
     fireEvent.click(within(dialog).getByRole("button", { name: /Yes, Sign Out/i }));
     await waitFor(() => expect(mocks.logout).toHaveBeenCalledTimes(1));
+  });
+
+  it("BUG-036: Opening Book Appointment modal locks root document scroll without double scrollbars and unlocks on close", async () => {
+    mocks.api.mockImplementation((path: string) => {
+      if (path.includes("/patient/profile")) {
+        return Promise.resolve({
+          id: "u1",
+          fullName: "Test Patient",
+          phone: "03001234567",
+          address: "12 Clifton",
+          dateOfBirth: "1995-05-10",
+          gender: "female",
+        });
+      }
+      return Promise.resolve([]);
+    });
+
+    render(<Appointments />);
+    expect(document.documentElement.classList.contains("dialog-scroll-locked")).toBe(false);
+
+    fireEvent.click(await screen.findByRole("button", { name: /Book appointment/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(dialog).toHaveTextContent(/Book appointment/i);
+    expect(dialog.className).toContain("overflow-hidden");
+    expect(document.documentElement.classList.contains("dialog-scroll-locked")).toBe(true);
+
+    const dialogBody = dialog.querySelector("[data-dialog-body=\"true\"]") as HTMLElement;
+    expect(dialogBody).not.toBeNull();
+    expect(dialogBody.className).toContain("overflow-y-auto");
+    expect(dialogBody.className).toContain("thin-scrollbar");
+
+    fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+    expect(document.documentElement.classList.contains("dialog-scroll-locked")).toBe(false);
   });
 });

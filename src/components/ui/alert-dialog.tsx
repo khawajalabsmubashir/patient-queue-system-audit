@@ -13,16 +13,34 @@ const AlertDialogPortal = AlertDialogPrimitive.Portal;
 const AlertDialogOverlay = React.forwardRef<
   React.ElementRef<typeof AlertDialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>
->(({ className, ...props }, ref) => (
-  <AlertDialogPrimitive.Overlay
-    className={cn(
-      "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      className,
-    )}
-    {...props}
-    ref={ref}
-  />
-));
+>(({ className, ...props }, ref) => {
+  React.useEffect(() => {
+    const root = document.documentElement;
+    const next = Number(root.getAttribute("data-modal-lock-count") ?? "0") + 1;
+    root.setAttribute("data-modal-lock-count", String(next));
+    root.classList.add("dialog-scroll-locked");
+    return () => {
+      const remaining = Math.max(0, Number(root.getAttribute("data-modal-lock-count") ?? "1") - 1);
+      if (remaining === 0) {
+        root.removeAttribute("data-modal-lock-count");
+        root.classList.remove("dialog-scroll-locked");
+      } else {
+        root.setAttribute("data-modal-lock-count", String(remaining));
+      }
+    };
+  }, []);
+
+  return (
+    <AlertDialogPrimitive.Overlay
+      className={cn(
+        "fixed inset-0 z-50 bg-black/80 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+        className,
+      )}
+      {...props}
+      ref={ref}
+    />
+  );
+});
 AlertDialogOverlay.displayName = AlertDialogPrimitive.Overlay.displayName;
 
 const AlertDialogContent = React.forwardRef<
