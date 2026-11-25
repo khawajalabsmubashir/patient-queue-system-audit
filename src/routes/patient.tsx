@@ -5,20 +5,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { logout } from "@/services/auth";
 import { runAction } from "@/services/queue";
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
-import {
-  Activity,
-  ChevronDown,
-  ClipboardList,
-  History,
-  Home,
-  LogOut,
-  Menu,
-  Pill,
-  ShieldCheck,
-  Ticket,
-  User,
-  X,
-} from "lucide-react";
+import { LogOut, ShieldCheck } from "lucide-react";
 import { Notifications, QueueBoundary } from "@/components/queue-feedback";
 import { prefetchClinicalData, useClinicalData } from "@/components/clinical";
 import { Logo } from "@/components/qc";
@@ -51,28 +38,9 @@ import type { PrintBrandingData } from "@/types/clinical-workflow";
 export const Route = createFileRoute("/patient")({ component: PatientLayout });
 
 const primaryNavLinks = [
-  { to: "/patient/dashboard", label: "Home", icon: Home, prefetch: "/patient/summary" },
-  { to: "/patient/live-queue", label: "Live queue", icon: Activity, prefetch: "" },
-  {
-    to: "/patient/appointments",
-    label: "Appointments",
-    icon: Ticket,
-    prefetch: "/patient/appointments",
-  },
+  { to: "/patient/dashboard", label: "Home", prefetch: "/patient/summary" },
+  { to: "/patient/appointments", label: "Appointments", prefetch: "/patient/appointments" },
 ] as const;
-
-const recordLinks = [
-  { to: "/patient/visits", label: "My visits", icon: ClipboardList, prefetch: "/patient/visits" },
-  {
-    to: "/patient/prescriptions",
-    label: "Prescriptions",
-    icon: Pill,
-    prefetch: "/patient/prescriptions",
-  },
-  { to: "/patient/history", label: "Visit history", icon: History, prefetch: "" },
-] as const;
-
-const allMobileNavLinks = [...primaryNavLinks, ...recordLinks] as const;
 
 const QUEUE_BOUNDARY_PATHS = new Set([
   "/patient/dashboard",
@@ -125,7 +93,7 @@ function PatientFooter() {
   return (
     <>
       <footer className="mt-14 bg-[#0d4633] text-emerald-50/90 print:hidden">
-        <div className="mx-auto max-w-7xl px-5 py-11">
+        <div className="mx-auto max-w-6xl px-5 py-11">
           <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.35fr_1fr_1fr_1fr]">
             {/* Column 1: Clinic Identity & Directions */}
             <div className="min-w-0 space-y-2.5 text-sm">
@@ -203,8 +171,8 @@ function PatientFooter() {
                   </Link>
                 </li>
                 <li>
-                  <Link to="/account" className="hover:text-white hover:underline">
-                    Account &amp; security
+                  <Link to="/patient/profile" className="hover:text-white hover:underline">
+                    Profile &amp; Account
                   </Link>
                 </li>
               </ul>
@@ -351,7 +319,7 @@ function PatientFooter() {
                   Arrive at the waiting room when 3 patients remain ahead of your token.
                 </li>
                 <li>
-                  To cancel an upcoming slot, open your appointment card and choose Give up token.
+                  To cancel an upcoming slot, open your appointment in Appointments and manage its token.
                 </li>
               </ul>
             )}
@@ -389,10 +357,10 @@ function PatientLayoutContent() {
   const { profile } = useAuth();
   useClinicContext();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const normalizedPath = pathname.replace(/\/$/, "") || "/patient/dashboard";
   const needsQueueBoundary = QUEUE_BOUNDARY_PATHS.has(normalizedPath);
-  const recordsActive = recordLinks.some((r) => normalizedPath.startsWith(r.to));
+  const isHomePage =
+    normalizedPath === "/patient/dashboard" || normalizedPath === "/patient";
 
   const prefetchNav = (to: string, prefetchPath: string) => {
     if (to === "/patient/appointments") {
@@ -403,6 +371,7 @@ function PatientLayoutContent() {
     if (to === "/patient/dashboard") {
       prefetchClinicalData("/patient/summary");
       prefetchClinicalData("/patient/appointments");
+      prefetchClinicalData("/patient/visits");
       return;
     }
     if (prefetchPath) prefetchClinicalData(prefetchPath);
@@ -412,156 +381,90 @@ function PatientLayoutContent() {
     <div className="flex min-h-screen flex-col overflow-x-clip bg-background">
       {/* Single Primary Navigation Bar */}
       <header className="sticky top-0 z-30 border-b border-border bg-card/95 backdrop-blur print:hidden">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between gap-4 px-5">
-          <div className="flex min-w-0 items-center gap-6">
-            <Link to="/patient/dashboard" className="min-w-0 shrink-0">
-              <Logo />
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <div className="flex h-16 items-center justify-between gap-2 sm:h-[72px] sm:gap-4">
+            <Link to="/patient/dashboard" className="min-w-0 shrink">
+              <Logo subtitle="Patient Portal" />
             </Link>
 
-            <nav className="hidden items-center gap-1 lg:flex" aria-label="Main navigation">
+            <nav
+              aria-label="Main navigation"
+              className="flex shrink-0 items-center gap-1 rounded-xl border border-border/80 bg-muted/60 p-1"
+            >
               {primaryNavLinks.map((l) => (
                 <Link
                   key={l.to}
                   to={l.to}
                   onMouseEnter={() => prefetchNav(l.to, l.prefetch)}
                   onFocus={() => prefetchNav(l.to, l.prefetch)}
-                  className="shrink-0 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-muted/60 hover:text-foreground"
-                  activeProps={{ className: "!bg-primary-soft !text-primary font-semibold" }}
+                  className="shrink-0 whitespace-nowrap rounded-lg border border-transparent px-3 py-1.5 text-xs font-semibold text-muted-foreground transition hover:text-foreground sm:px-4 sm:py-2 sm:text-sm"
+                  activeProps={{
+                    className:
+                      "!border-primary/25 !bg-primary-soft !text-primary font-semibold",
+                  }}
                 >
                   {l.label}
                 </Link>
               ))}
+            </nav>
+
+            <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+              <div className="hidden max-w-48 md:block md:max-w-56">
+                <ClinicSwitcher />
+              </div>
+
+              <Notifications role="patient" />
 
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className={`inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
-                      recordsActive
-                        ? "bg-primary-soft font-semibold text-primary"
-                        : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                    }`}
+                    aria-label="Profile menu"
+                    className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:size-10 sm:text-sm"
                   >
-                    My records
-                    <ChevronDown className="size-3.5 opacity-70" aria-hidden="true" />
+                    {initialsOf(profile?.fullName)}
                   </button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="w-48 rounded-xl p-1.5">
-                  {recordLinks.map((r) => (
-                    <DropdownMenuItem key={r.to} asChild>
-                      <Link
-                        to={r.to}
-                        onMouseEnter={() => prefetchNav(r.to, r.prefetch)}
-                        className="flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm"
-                      >
-                        <r.icon className="size-4 text-muted-foreground" aria-hidden="true" />
-                        {r.label}
-                      </Link>
-                    </DropdownMenuItem>
-                  ))}
+                <DropdownMenuContent align="end" className="w-60 rounded-xl p-1.5">
+                  <DropdownMenuLabel className="px-2.5 py-2">
+                    <p className="truncate text-sm font-semibold text-foreground">
+                      {profile?.fullName || "Patient"}
+                    </p>
+                    {profile?.email && (
+                      <p className="truncate text-xs font-normal text-muted-foreground">
+                        {profile.email}
+                      </p>
+                    )}
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link
+                      to="/patient/profile"
+                      onMouseEnter={() => prefetchClinicalData("/patient/profile")}
+                      className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm"
+                    >
+                      <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
+                      Profile &amp; Account
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={() => setShowLogoutConfirm(true)}
+                    className="cursor-pointer rounded-lg px-2.5 py-2 text-sm font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"
+                  >
+                    <LogOut className="size-4" aria-hidden="true" />
+                    Sign Out
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
-            </nav>
+            </div>
           </div>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2 sm:gap-2.5">
-            <div className="hidden max-w-48 sm:block md:max-w-56">
-              <ClinicSwitcher />
-            </div>
-
-            <Notifications role="patient" />
-
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Profile menu"
-                  className="grid size-9 shrink-0 place-items-center rounded-full bg-primary text-xs font-semibold text-primary-foreground shadow-xs transition hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  {initialsOf(profile?.fullName)}
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-64 rounded-xl p-1.5">
-                <DropdownMenuLabel className="px-2.5 py-2">
-                  <p className="truncate text-sm font-semibold text-foreground">
-                    {profile?.fullName || "Patient"}
-                  </p>
-                  {profile?.email && (
-                    <p className="truncate text-xs font-normal text-muted-foreground">
-                      {profile.email}
-                    </p>
-                  )}
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link
-                    to="/patient/profile"
-                    onMouseEnter={() => prefetchClinicalData("/patient/profile")}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm"
-                  >
-                    <User className="size-4 text-muted-foreground" aria-hidden="true" />
-                    My profile
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link
-                    to="/account"
-                    onMouseEnter={() => prefetchClinicalData("/account")}
-                    className="flex w-full cursor-pointer items-center gap-2 rounded-lg px-2.5 py-2 text-sm"
-                  >
-                    <ShieldCheck className="size-4 text-primary" aria-hidden="true" />
-                    Account &amp; security
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onSelect={() => setShowLogoutConfirm(true)}
-                  className="cursor-pointer rounded-lg px-2.5 py-2 text-sm font-medium text-destructive focus:bg-destructive/10 focus:text-destructive"
-                >
-                  <LogOut className="size-4" aria-hidden="true" />
-                  Sign Out
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <button
-              type="button"
-              aria-label="Toggle navigation menu"
-              aria-expanded={mobileMenuOpen}
-              onClick={() => setMobileMenuOpen((v) => !v)}
-              className="grid size-10 shrink-0 place-items-center rounded-lg border border-border bg-card text-foreground transition hover:bg-muted lg:hidden"
-            >
-              {mobileMenuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
-            </button>
+          {/* Mobile Clinic Selector inside the same single header */}
+          <div className="pb-3 md:hidden">
+            <ClinicSwitcher />
           </div>
         </div>
-
-        {/* Collapsible mobile link list inside the single header navigation */}
-        {mobileMenuOpen && (
-          <nav
-            aria-label="Mobile navigation"
-            className="border-t border-border bg-background px-5 py-3 lg:hidden"
-          >
-            <div className="mb-3 sm:hidden">
-              <ClinicSwitcher />
-            </div>
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {allMobileNavLinks.map((l) => (
-                <Link
-                  key={l.to}
-                  to={l.to}
-                  onClick={() => setMobileMenuOpen(false)}
-                  onMouseEnter={() => prefetchNav(l.to, l.prefetch)}
-                  className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-muted-foreground transition hover:bg-muted hover:text-foreground"
-                  activeProps={{ className: "!bg-primary-soft !text-primary font-semibold" }}
-                >
-                  <l.icon className="size-4 shrink-0" aria-hidden="true" />
-                  <span className="truncate">{l.label}</span>
-                </Link>
-              ))}
-            </div>
-          </nav>
-        )}
       </header>
 
       <AlertDialog open={showLogoutConfirm} onOpenChange={setShowLogoutConfirm}>
@@ -587,7 +490,7 @@ function PatientLayoutContent() {
       <main
         id="main-content"
         tabIndex={-1}
-        className="mx-auto w-full min-w-0 max-w-7xl flex-1 px-5 py-6 md:py-9"
+        className="mx-auto w-full min-w-0 max-w-6xl flex-1 px-4 py-6 sm:px-6 sm:py-8"
       >
         {needsQueueBoundary ? (
           <QueueBoundary kind={pathname.includes("history") ? "list" : "hero"}>
@@ -598,7 +501,7 @@ function PatientLayoutContent() {
         )}
       </main>
 
-      <PatientFooter />
+      {isHomePage && <PatientFooter />}
     </div>
   );
 }

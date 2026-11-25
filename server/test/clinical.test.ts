@@ -84,6 +84,24 @@ test("clinical workflow: global profiles, structured notes/vitals/prescriptions,
     );
     assert.equal((await req("/patient/profile", patient.cookie)).data.fullName, "Clinical Updated");
     assert.equal((await req("/patient/profile", patient.cookie)).data.dateOfBirth, "1990-05-12");
+    // Issue 17: Updating patient profile without address preserves existing address
+    assert.equal(
+      (
+        await req(
+          "/patient/profile",
+          patient.cookie,
+          {
+            fullName: "Clinical Updated",
+            phone: "03001234567",
+            dateOfBirth: "1990-05-12",
+            gender: "female",
+          },
+          "PUT",
+        )
+      ).status,
+      200,
+    );
+    assert.equal((await req("/patient/profile", patient.cookie)).data.address, "Patient address");
     assert.equal(
       (
         await req(
@@ -218,7 +236,7 @@ test("clinical workflow: global profiles, structured notes/vitals/prescriptions,
       admin.cookie,
       {
         patientId: uid,
-        scheduledAt: "2026-11-10T11:30",
+        scheduledAt: new Date(Date.now() + 5 * 86_400_000).toISOString().slice(0, 10) + "T11:30",
         reason: "Follow-up",
       },
     );
@@ -266,6 +284,19 @@ test("clinical workflow: global profiles, structured notes/vitals/prescriptions,
       ).data.id,
       uid,
     );
+    const completedVisits = (await req("/patient/visits", patient.cookie)).data;
+    assert.ok(completedVisits.length >= 1);
+    const pdfRes = await fetch(`http://127.0.0.1:${port}/api/patient/visits/${completedVisits[0].id}/prescription-pdf`, {
+      headers: { cookie: patient.cookie },
+    });
+    assert.equal(pdfRes.status, 200);
+    assert.match(pdfRes.headers.get("content-type") || "", /application\/pdf/);
+    const pdfText = Buffer.from(await pdfRes.arrayBuffer()).toString("latin1");
+    assert.ok(pdfText.startsWith("%PDF-"));
+    const otherPdfRes = await fetch(`http://127.0.0.1:${port}/api/patient/visits/${completedVisits[0].id}/prescription-pdf`, {
+      headers: { cookie: other.cookie },
+    });
+    assert.equal(otherPdfRes.status, 404);
   } finally {
     await app.close();
   }

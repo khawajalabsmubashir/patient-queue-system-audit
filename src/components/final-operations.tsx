@@ -872,7 +872,7 @@ export function BrandingSettings() {
     </>
   );
 }
-export function AccountSettings() {
+export function AccountSecurityPanel({ embedded = false }: { embedded?: boolean }) {
   const remote = useClinicalData<{
       profile: { fullName: string; email: string; role: string };
       googleLinked: boolean;
@@ -899,80 +899,96 @@ export function AccountSettings() {
   }
   if (!remote.data) return <ClinicalLoading error={remote.error} retry={remote.reload} />;
   const d = remote.data;
-  return (
-    <>
-      <PageHeader
-        title="Account & security"
-        sub="Manage your password and active Neuro Spine Care Center sessions."
-      />
-      <div className="surface space-y-5 p-6">
+  const card = (
+    <section className="surface space-y-5 p-6">
+      {embedded ? (
+        <div className="border-b border-border pb-4">
+          <h2 className="text-lg font-semibold text-foreground">Account Security</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Update your password and manage active Neuro Spine Care Center sessions.
+          </p>
+        </div>
+      ) : (
         <p className="break-words [overflow-wrap:anywhere]">
           {d.profile.fullName} · {d.profile.email} · {d.profile.role}
         </p>
-        <p className="text-sm">Google account: {d.googleLinked ? "Linked" : "Not linked"}</p>
-        {error && (
-          <p role="alert" className="text-destructive">
-            {error}
-          </p>
-        )}
-        {message && <p role="status">{message}</p>}
-        <form
-          className="max-w-md space-y-4"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const form = e.currentTarget;
-            const f = new FormData(form);
-            const currentPw = String(f.get("currentPassword") ?? "");
-            const nextPw = String(f.get("newPassword") ?? "");
-            const pwCheck = validatePassword(nextPw, 12);
-            if (!pwCheck.ok) {
-              setError(pwCheck.error);
-              return;
-            }
-            if (nextPw === currentPw) {
-              setError("New password must be different from the current password.");
-              return;
-            }
-            if (nextPw !== String(f.get("confirm") ?? "")) {
-              setError("New passwords must match.");
-              return;
-            }
-            void action(
-              "/account/password",
-              { currentPassword: currentPw, newPassword: nextPw },
-              "PUT",
-            ).then((ok) => {
-              if (ok) form.reset();
-            });
-          }}
-        >
-          <Field
-            required
-            label="Current password"
-            type="password"
-            name="currentPassword"
-            autoComplete="current-password"
-          />
-          <Field
-            required
-            minLength={12}
-            maxLength={72}
-            label="New password"
-            type="password"
-            name="newPassword"
-            autoComplete="new-password"
-          />
-          <Field
-            required
-            label="Confirm new password"
-            type="password"
-            name="confirm"
-            autoComplete="new-password"
-          />
-          <Btn disabled={busy}>Change password</Btn>
-        </form>
-        <h2 className="font-semibold">Active sessions ({d.sessions.length})</h2>
-        <ul className="space-y-2 text-sm">
+      )}
+      <p className="text-sm text-muted-foreground">
+        Google account:{" "}
+        <span className="font-medium text-foreground">
+          {d.googleLinked ? "Linked" : "Not linked"}
+        </span>
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+      {message && (
+        <p role="status" className="text-sm text-success">
+          {message}
+        </p>
+      )}
+      <form
+        className="max-w-md space-y-4"
+        onSubmit={(e) => {
+          e.preventDefault();
+          const form = e.currentTarget;
+          const f = new FormData(form);
+          const currentPw = String(f.get("currentPassword") ?? "");
+          const nextPw = String(f.get("newPassword") ?? "");
+          const pwCheck = validatePassword(nextPw, 12);
+          if (!pwCheck.ok) {
+            setError(pwCheck.error);
+            return;
+          }
+          if (nextPw === currentPw) {
+            setError("New password must be different from the current password.");
+            return;
+          }
+          if (nextPw !== String(f.get("confirm") ?? "")) {
+            setError("New passwords must match.");
+            return;
+          }
+          void action(
+            "/account/password",
+            { currentPassword: currentPw, newPassword: nextPw },
+            "PUT",
+          ).then((ok) => {
+            if (ok) form.reset();
+          });
+        }}
+      >
+        <Field
+          required
+          label="Current password"
+          type="password"
+          name="currentPassword"
+          autoComplete="current-password"
+        />
+        <Field
+          required
+          minLength={12}
+          maxLength={72}
+          label="New password"
+          type="password"
+          name="newPassword"
+          autoComplete="new-password"
+        />
+        <Field
+          required
+          label="Confirm new password"
+          type="password"
+          name="confirm"
+          autoComplete="new-password"
+        />
+        <Btn disabled={busy}>Change password</Btn>
+      </form>
+      <div className="border-t border-border pt-4 space-y-3">
+        <h3 className="text-sm font-semibold text-foreground">
+          Active sessions ({d.sessions.length})
+        </h3>
+        <ul className="space-y-2 text-sm text-muted-foreground">
           {d.sessions.map((s, i) => (
             <li key={i}>
               {s.current ? "This session" : "Other session"} · Expires{" "}
@@ -980,7 +996,7 @@ export function AccountSettings() {
             </li>
           ))}
         </ul>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap gap-3 pt-1">
           <Btn
             variant="secondary"
             disabled={busy}
@@ -988,13 +1004,28 @@ export function AccountSettings() {
           >
             Sign out other sessions
           </Btn>
-          <Btn variant="secondary" onClick={() => void logout()}>
-            Sign out
-          </Btn>
+          {!embedded && (
+            <Btn variant="secondary" onClick={() => void logout()}>
+              Sign out
+            </Btn>
+          )}
         </div>
       </div>
+    </section>
+  );
+  if (embedded) return card;
+  return (
+    <>
+      <PageHeader
+        title="Account & security"
+        sub="Manage your password and active Neuro Spine Care Center sessions."
+      />
+      {card}
     </>
   );
+}
+export function AccountSettings() {
+  return <AccountSecurityPanel />;
 }
 export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolean }) {
   const { clinic } = useQueue();

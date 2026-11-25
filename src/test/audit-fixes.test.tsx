@@ -21,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   login: vi.fn(),
   logout: vi.fn(),
   beginGoogleLogin: vi.fn(),
+  restoreSession: vi.fn(async () => {}),
   navigate: vi.fn(),
   pathname: "/patient/appointments",
   role: "patient" as "patient" | "admin" | "nurse" | "receptionist",
@@ -47,6 +48,7 @@ vi.mock("@/services/auth", () => ({
   login: mocks.login,
   logout: mocks.logout,
   beginGoogleLogin: mocks.beginGoogleLogin,
+  restoreSession: mocks.restoreSession,
 }));
 vi.mock("@/providers/auth-provider", () => ({
   useAuth: () => ({
@@ -142,6 +144,7 @@ import { Route as AdminRoute } from "@/routes/admin";
 import { Route as StaffRoute } from "@/routes/staff";
 import { Route as PatientRoute } from "@/routes/patient";
 import { Route as DashboardRoute } from "@/routes/patient.dashboard";
+import { Route as ProfileRoute } from "@/routes/patient.profile";
 import { BillingWorkspace } from "@/components/billing-workspace";
 import { SelectField } from "@/components/form-controls";
 import { validatePassword, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
@@ -292,7 +295,7 @@ describe("Audit fixes verification", () => {
     expect(screen.queryByRole("button", { name: /Manage tags/i })).toBeNull();
   });
 
-  it("Fix 6 & Home UI Task 1-2 & 8: Single main nav bar, profile dropdown with Account & security + Sign Out, QueueBoundary scoping, and Clinic footer", async () => {
+  it("Fix 6 & Issue 17: Single main nav bar (Home, Appointments), 2-item Profile dropdown, and Home-only Clinic footer", async () => {
     mocks.api.mockResolvedValue({
       clinic: {
         display_name: "Health Point",
@@ -304,62 +307,63 @@ describe("Audit fixes verification", () => {
     });
     mocks.pathname = "/patient/visits";
     const PatientComponent = PatientRoute.options.component!;
-    render(<PatientComponent />);
+    const { unmount } = render(<PatientComponent />);
 
-    // Only one primary nav bar; secondary Patient records bar is removed
+    // Only one primary nav bar with Home & Appointments
     expect(screen.queryByRole("navigation", { name: "Patient records" })).toBeNull();
     const mainNav = screen.getByRole("navigation", { name: "Main navigation" });
     expect(within(mainNav).getByText("Home")).toBeVisible();
-    expect(within(mainNav).getByText("Live queue")).toBeVisible();
     expect(within(mainNav).getByText("Appointments")).toBeVisible();
-    const recordsTrigger = within(mainNav).getByRole("button", { name: /My records/i });
-    expect(recordsTrigger).toBeVisible();
-    fireEvent.keyDown(recordsTrigger, { key: "Enter", code: "Enter" });
-    expect(await screen.findByRole("menuitem", { name: /My visits/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Prescriptions/i })).toBeVisible();
-    expect(screen.queryByRole("menuitem", { name: /Billing/i })).toBeNull();
-    expect(document.body.style.overflow).toBe("");
-    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
-    fireEvent.keyDown(recordsTrigger, { key: "Escape" });
+    expect(within(mainNav).queryByText("Live queue")).toBeNull();
+    expect(within(mainNav).queryByRole("button", { name: /My records/i })).toBeNull();
 
-    // Sign Out & Account & security are NOT separate standalone navbar links/buttons
+    // Sign Out is NOT a separate standalone navbar button
     const header = document.querySelector("header")!;
     expect(within(header).queryByRole("button", { name: /^Sign Out$/i })).toBeNull();
-    expect(within(header).queryByRole("link", { name: /Account & security/i })).toBeNull();
 
     // QueueBoundary remains omitted on non-queue visits route
     expect(screen.queryByTestId("queue-boundary")).toBeNull();
     expect(screen.getByTestId("route-outlet")).toBeVisible();
 
-    // PDF-matched dark emerald Footer includes clinic identity, Quick links, My records, Help + interactive FAQ modal
+    // Footer is NOT rendered on non-Home pages (/patient/visits)
+    expect(document.querySelector("footer")).toBeNull();
+
+    // Profile dropdown includes ONLY Profile & Account and Sign Out -> confirmation prompt without scroll-lock
+    const profileTrigger = within(header).getByRole("button", { name: "Profile menu" });
+    fireEvent.keyDown(profileTrigger, { key: "Enter", code: "Enter" });
+    const items = await screen.findAllByRole("menuitem");
+    expect(items).toHaveLength(2);
+    expect(screen.getByRole("menuitem", { name: /Profile & Account/i })).toHaveAttribute(
+      "href",
+      "/patient/profile",
+    );
+    expect(document.body.style.overflow).toBe("");
+    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
+
+    const signOutItem = screen.getByRole("menuitem", { name: /Sign Out/i });
+    fireEvent.click(signOutItem);
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent(/Are you sure you want to sign out/i);
+    unmount();
+
+    // Footer IS rendered on Patient Home (/patient/dashboard)
+    mocks.pathname = "/patient/dashboard";
+    render(<PatientComponent />);
     const footer = document.querySelector("footer")!;
+    expect(footer).not.toBeNull();
     expect(footer.className).toContain("bg-[#0d4633]");
     expect(footer).toHaveTextContent("Health Point");
     expect(footer).toHaveTextContent("Plot 12, Clifton Block 5");
     expect(footer).toHaveTextContent("03001112233");
     expect(footer).toHaveTextContent(/All rights reserved/i);
     expect(within(footer).getByRole("link", { name: /Get directions/i })).toBeVisible();
-    expect(within(footer).getByRole("link", { name: /Medical documents/i })).toBeVisible();
-    expect(within(footer).getByRole("link", { name: /^Live queue$/i })).toBeVisible();
+    expect(within(footer).getByRole("link", { name: /Profile & Account/i })).toHaveAttribute(
+      "href",
+      "/patient/profile",
+    );
     fireEvent.click(within(footer).getByRole("button", { name: "FAQs" }));
     expect(await screen.findByRole("dialog")).toHaveTextContent(/Patient FAQs/i);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
-
-    // Profile dropdown includes My profile, Account & security, and Sign Out -> confirmation prompt without scroll-lock
-    const profileTrigger = within(header).getByRole("button", { name: "Profile menu" });
-    fireEvent.keyDown(profileTrigger, { key: "Enter", code: "Enter" });
-    expect(await screen.findByRole("menuitem", { name: /My profile/i })).toBeVisible();
-    expect(document.body.style.overflow).toBe("");
-    expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
-    expect(screen.getByRole("menuitem", { name: /Account & security/i })).toHaveAttribute(
-      "href",
-      "/account",
-    );
-
-    const signOutItem = screen.getByRole("menuitem", { name: /Sign Out/i });
-    fireEvent.click(signOutItem);
-    const dialog = await screen.findByRole("alertdialog");
-    expect(dialog).toHaveTextContent(/Are you sure you want to sign out/i);
   });
 
   it("Fix 7: Validation rejects oversized name/phone and SQL/script injection on Register", async () => {
@@ -845,7 +849,7 @@ describe("Audit fixes verification", () => {
     expect(screen.queryByText(/Northstar Medical Clinic/)).toBeNull();
   });
 
-  it("BUG-27, BUG-029 & BUG-034: Dashboard removes repeated quick-action links, renders PDF layout & places Live queue first on mobile", async () => {
+  it("Issue 17 & BUG-27: Redesigned Patient Home has Welcome bar, Live queue top-corner + Simulate Queue, Follow-up small message, History & My Visits without Consultation doctor text, and zero Give up token", async () => {
     mocks.api.mockImplementation((path: string) => {
       if (path.includes("/patient/appointments")) {
         return Promise.resolve([
@@ -856,14 +860,6 @@ describe("Audit fixes verification", () => {
             scheduledAt: "2030-11-19T10:45",
             status: "confirmed",
             token: { id: "tok-1", tokenCode: "HP-001", status: "waiting" },
-          },
-          {
-            id: "appt-later",
-            clinicId: "clinic",
-            clinicName: "Health Point",
-            scheduledAt: "2030-11-20T11:45",
-            status: "scheduled",
-            token: { id: "tok-2", tokenCode: "HP-002", status: "waiting" },
           },
         ]);
       }
@@ -887,33 +883,147 @@ describe("Audit fixes verification", () => {
           notifications: [],
         });
       }
+      if (path.includes("/patient/visits")) {
+        return Promise.resolve([
+          {
+            id: "visit-1",
+            patientId: "u1",
+            patientName: "Dr. Admin",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            clinicAddress: "Plot 12, Clifton Block 5",
+            clinicPhone: "03001112233",
+            doctorName: "Dr. Ayesha Mahmood",
+            visitAt: "2026-11-16T09:00:00Z",
+            status: "completed",
+            patientSummary: "Spine checkup",
+            diagnosis: null,
+            treatmentPlan: "Daily lumbar stretches",
+            followUpInstructions: "",
+            followUpDate: null,
+            completedAt: "2026-11-16T09:30:00Z",
+            prescription: {
+              instructions: "",
+              items: [
+                {
+                  medicine: "Mecobalamin 500mcg",
+                  dose: "1 tab",
+                  frequency: "Daily",
+                  duration: "30 days",
+                  instructions: "After breakfast",
+                },
+              ],
+            },
+          },
+        ]);
+      }
       return Promise.resolve([]);
     });
 
     const DashboardComponent = DashboardRoute.options.component!;
     render(<DashboardComponent />);
 
-    const greeting = await screen.findByText(/Good morning, Dr\./);
+    // Welcome banner + Book Appointment CTA
+    const greeting = await screen.findByRole("heading", { name: /Welcome, Dr. Admin/i });
     expect(greeting).toBeVisible();
     const heroSection = greeting.closest("section")!;
-    expect(within(heroSection).getByRole("button", { name: /Book appointment/i })).toBeVisible();
+    expect(within(heroSection).getByRole("button", { name: /Book Appointment/i })).toBeVisible();
     expect(within(heroSection).queryByRole("link", { name: /Live queue/i })).toBeNull();
-    // BUG-27: Repeated 4-card Quick actions navigation strip is removed
     expect(screen.queryByRole("region", { name: "Quick actions" })).toBeNull();
-    // Next appointment + LATER + color-coded badges
-    expect(await screen.findByText("HP-001")).toBeVisible();
-    expect(screen.getByText("Confirmed")).toBeVisible();
-    expect(screen.getByText("Scheduled")).toBeVisible();
-    // Care summary excludes Billing card while preserving clinical cards + Follow-up Pending pill
-    expect(await screen.findByRole("heading", { name: "Care summary" })).toBeVisible();
-    expect(screen.queryByText("1 invoice unpaid")).toBeNull();
-    expect(screen.queryByText("Outstanding bills")).toBeNull();
-    expect(screen.getByText("Pending")).toBeVisible();
-    // BUG-034: Live queue card uses order-first on mobile and Before you arrive renders numbered steps
-    const liveQueueRegion = screen.getByRole("heading", { name: "Live queue" }).closest("section")!;
-    expect(liveQueueRegion.className).toContain("order-first");
-    expect(liveQueueRegion.className).toContain("lg:order-none");
-    expect(screen.getByText("Before you arrive")).toBeVisible();
+
+    // Live queue link at top corner of the queue box + Token HP-001 + NO Give up token on Home
+    const queueSection = screen.getByRole("region", { name: "Live queue status" });
+    expect(within(queueSection).getByRole("link", { name: /Live queue/i })).toHaveAttribute(
+      "href",
+      "/patient/live-queue",
+    );
+    expect((await within(queueSection).findAllByText("HP-001")).length).toBeGreaterThanOrEqual(1);
+    expect(screen.queryByRole("button", { name: /Give up token/i })).toBeNull();
+
+    // Interactive Simulate Queue cycles queue stages cleanly
+    fireEvent.click(within(queueSection).getByRole("button", { name: /Simulate Queue/i }));
+    expect(within(queueSection).getByText("Your turn is coming soon...")).toBeVisible();
+    fireEvent.click(within(queueSection).getByRole("button", { name: /Simulate Queue/i }));
+    expect(within(queueSection).getByText("Your turn now — please proceed")).toBeVisible();
+    expect(within(queueSection).getByText("NOW")).toBeVisible();
+
+    // Small Follow-up message shows real follow-up guidance + Pending status
+    const followupRegion = screen.getByRole("region", { name: "Follow-up message" });
+    expect(within(followupRegion).getByText(/Take proper rest and medicine on time./i)).toBeVisible();
+    expect(within(followupRegion).getByText("Pending")).toBeVisible();
+
+    // History & My Visits shows date selector + Download PDF link without Consultation with Dr. subtitle
+    const historySection = screen.getByRole("region", { name: "History and my visits" });
+    expect(within(historySection).getByRole("heading", { name: "History & My Visits" })).toBeVisible();
+    expect(await within(historySection).findByRole("link", { name: /Download Your Prescription \(PDF\)/i })).toHaveAttribute(
+      "href",
+      "/api/patient/visits/visit-1/prescription-pdf",
+    );
+    expect(within(historySection).queryByText(/Consultation with Dr./i)).toBeNull();
+    expect(within(historySection).queryByText(/Ayesha Mahmood/i)).toBeNull();
+  });
+
+  it("Issue 17: Unified Profile & Account page omits Patient ID and Address, preserves Email/Phone/DOB/Gender and embeds Account Security", async () => {
+    mocks.api.mockImplementation((path: string) => {
+      if (path.includes("/patient/profile")) {
+        return Promise.resolve({
+          id: "NSCC-2026-8841",
+          fullName: "Sara Tariq",
+          email: "sara@example.com",
+          phone: "03008291045",
+          dateOfBirth: "1992-05-12",
+          gender: "female",
+          address: "Hidden address",
+          emergencyContactName: "",
+          emergencyContactPhone: "",
+          bloodGroup: "",
+          allergies: "",
+          chronicConditions: "",
+          currentMedications: "",
+        });
+      }
+      if (path === "/account") {
+        return Promise.resolve({
+          profile: { fullName: "Sara Tariq", email: "sara@example.com", role: "patient" },
+          googleLinked: false,
+          sessions: [{ expiresAt: Date.now() + 3600_000, current: true }],
+        });
+      }
+      return Promise.resolve({});
+    });
+
+    const ProfileComponent = ProfileRoute.options.component!;
+    render(<ProfileComponent />);
+
+    expect(await screen.findByRole("heading", { name: "Profile & Account" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Personal Details" })).toBeVisible();
+    expect(screen.queryByText(/NSCC-2026-8841/)).toBeNull();
+    expect(screen.queryByLabelText(/Patient ID/i)).toBeNull();
+    expect(screen.queryByLabelText(/Address/i)).toBeNull();
+
+    expect(screen.getByLabelText("Email (sign-in identity)")).toHaveValue("sara@example.com");
+    expect(screen.getByLabelText("Full name")).toHaveValue("Sara Tariq");
+    expect(screen.getByLabelText("Phone")).toHaveValue("03008291045");
+    expect(screen.getByLabelText("Date of birth")).toHaveValue("1992-05-12");
+
+    // Embedded Account Security section directly below Personal Details
+    expect(await screen.findByRole("heading", { name: "Account Security" })).toBeVisible();
+    expect(screen.getByLabelText("Current password")).toBeVisible();
+    expect(screen.getByLabelText("New password")).toBeVisible();
+    expect(screen.getByLabelText("Confirm new password")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Personal Details" }));
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith("/patient/profile", {
+        method: "PUT",
+        body: {
+          fullName: "Sara Tariq",
+          phone: "03008291045",
+          dateOfBirth: "1992-05-12",
+          gender: "female",
+        },
+      }),
+    );
   });
 
   it("BUG-033: Billing search includes helpful placeholder text and aligns with Status filter", async () => {

@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import type { Status } from "@/lib/queue-store";
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-export function Logo({ className }: { className?: string }) {
+export function Logo({ className, subtitle }: { className?: string; subtitle?: string }) {
   return (
     <div className={cn("flex min-w-0 items-center gap-2.5", className)}>
       <div className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary text-primary-foreground">
@@ -21,9 +21,20 @@ export function Logo({ className }: { className?: string }) {
           <path d="M12 5v14M5 12h14" />
         </svg>
       </div>
-      <span className="min-w-0 truncate text-[15px] font-semibold leading-tight tracking-tight">
-        Neuro Spine Care Center
-      </span>
+      {subtitle ? (
+        <div className="min-w-0">
+          <span className="block min-w-0 truncate text-[15px] font-semibold leading-tight tracking-tight">
+            Neuro Spine Care Center
+          </span>
+          <span className="hidden text-xs font-normal text-muted-foreground sm:block">
+            {subtitle}
+          </span>
+        </div>
+      ) : (
+        <span className="min-w-0 truncate text-[15px] font-semibold leading-tight tracking-tight">
+          Neuro Spine Care Center
+        </span>
+      )}
     </div>
   );
 }

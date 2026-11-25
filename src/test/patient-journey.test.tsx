@@ -91,8 +91,8 @@ it("preserves login, anonymous appointment-token tracking, completion and histor
   });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "TestPassword123!" } });
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-  await screen.findByRole("heading", { name: "Good morning, Zain" });
-  expect(screen.getByText("~20 min")).toBeInTheDocument();
+  await screen.findByRole("heading", { name: "Welcome, Zain" });
+  expect(screen.getAllByText("~20 min").length).toBeGreaterThanOrEqual(1);
   await act(async () => {
     await router.navigate({ to: "/patient/live-queue" });
   });
@@ -105,7 +105,9 @@ it("preserves login, anonymous appointment-token tracking, completion and histor
   expect(screen.getByRole("status")).toHaveTextContent("Your token is being called");
   act(() => actions.markDone());
   expect(screen.getByRole("status")).toHaveTextContent("Visit completed");
-  fireEvent.click(screen.getByRole("link", { name: "Visit history" }));
+  await act(async () => {
+    await router.navigate({ to: "/patient/history" });
+  });
   await screen.findByRole("heading", { name: "Visit history" });
   expect(screen.getByText("Oct 5, 2026")).toBeInTheDocument();
   expect(screen.getByText("A-024")).toBeInTheDocument();
@@ -119,13 +121,11 @@ it.each(["no-queue", "completed"] as const)(
     await act(async () => {
       await router.navigate({ to: "/patient/dashboard" });
     });
-    await screen.findByRole("heading", { name: "Good morning, Zain" });
+    await screen.findByRole("heading", { name: "Welcome, Zain" });
     expect(screen.queryByRole("button", { name: /Get.*token/ })).toBeNull();
     expect(screen.queryByRole("link", { name: /Get.*token/ })).toBeNull();
     if (scenario === "no-queue")
-      expect(
-        await screen.findByRole("heading", { name: "Book your next appointment" }),
-      ).toBeInTheDocument();
+      expect(await screen.findByText(/No upcoming appointment token yet/i)).toBeInTheDocument();
     else expect(screen.getByText("Visit completed.")).toBeInTheDocument();
   },
 );

@@ -1,8 +1,10 @@
 import PDFDocument from "pdfkit";
 import { Router } from "express";
-import { one, type Database } from "../db/database.ts";
+import { one, type Database, type UserRow } from "../db/database.ts";
 import { requireRole, ApiError } from "../middleware/auth.ts";
+import { visitDetail } from "../services/clinical.ts";
 import { tokenValue } from "../services/queueService.ts";
+
 export function tokenDocumentRoutes(db: Database) {
   const r = Router();
   const data = async (id: string, user: { id: string; role: string }) => {
@@ -76,5 +78,84 @@ export function tokenDocumentRoutes(db: Database) {
       );
     res.send(await finished);
   });
+
+  r.get("/patient/visits/:id/prescription-pdf", requireRole(db, "patient"), async (req, res) => {
+    const user = res.locals["user"] as UserRow;
+    const visit = await visitDetail(db, String(req.params["id"]), user.id);
+    const visitDate = (visit.visitAt || "").slice(0, 10) || "visit";
+    const pdf = new PDFDocument({
+      size: "A4",
+      margin: 50,
+      info: { Title: "Neuro Spine Care Center Prescription" },
+    });
+    const chunks: Buffer[] = [];
+    pdf.on("data", (c) => chunks.push(c));
+    const finished = new Promise<Buffer>((resolve) =>
+      pdf.on("end", () => resolve(Buffer.concat(chunks))),
+    );
+    pdf.fillColor("#0F766E").fontSize(20).text("Neuro Spine Care Center");
+    pdf.moveDown(0.5).fillColor("#152b29").fontSize(15).text(visit.clinicName);
+    if (visit.clinicAddress || visit.clinicPhone) {
+      pdf
+        .fontSize(10)
+        .fillColor("#475569")
+        .text([visit.clinicAddress, visit.clinicPhone].filter(Boolean).join(" · "));
+    }
+    pdf.moveDown(1.5).fillColor("#0F766E").fontSize(12).text("PRESCRIPTION & VISIT SUMMARY");
+    pdf
+      .moveDown(0.5)
+      .fillColor("#152b29")
+      .fontSize(11)
+      .text("Patient: " + visit.patientName)
+      .text("Visit Date: " + visitDate)
+      .text("Clinic: " + visit.clinicName);
+    if (visit.diagnosis) {
+      pdf.text("Diagnosis: " + visit.diagnosis);
+    }
+    if (visit.patientSummary) {
+      pdf.moveDown().fontSize(11).fillColor("#0F766E").text("Clinical Summary");
+      pdf.fillColor("#152b29").fontSize(10).text(visit.patientSummary);
+    }
+    pdf.moveDown().fontSize(11).fillColor("#0F766E").text("Prescribed Medicines");
+    if (visit.prescription.items.length > 0) {
+      visit.prescription.items.forEach((item, index) => {
+        const title = [item.medicine, item.strength, item.dosageForm].filter(Boolean).join(" ");
+        const schedule = [item.dose, item.frequency, item.duration].filter(Boolean).join(" · ");
+        pdf.moveDown(0.4).fillColor("#152b29").fontSize(10.5).text(`${index + 1}. ${title}`);
+        if (schedule) pdf.fillColor("#475569").fontSize(9.5).text(`   ${schedule}`);
+        if (item.instructions) pdf.fillColor("#475569").fontSize(9.5).text(`   Note: ${item.instructions}`);
+      });
+    } else {
+      pdf.moveDown(0.4).fillColor("#475569").fontSize(10).text("No medications recorded for this visit.");
+    }
+    if (visit.prescription.instructions) {
+      pdf.moveDown().fillColor("#0F766E").fontSize(11).text("Prescription Advice");
+      pdf.fillColor("#152b29").fontSize(10).text(visit.prescription.instructions);
+    }
+    if (visit.treatmentPlan) {
+      pdf.moveDown().fillColor("#0F766E").fontSize(11).text("Treatment Plan");
+      pdf.fillColor("#152b29").fontSize(10).text(visit.treatmentPlan);
+    }
+    if (visit.followUpDate || visit.followUpInstructions) {
+      pdf.moveDown().fillColor("#0F766E").fontSize(11).text("Follow-up Guidance");
+      if (visit.followUpDate) pdf.fillColor("#152b29").fontSize(10).text("Follow-up date: " + visit.followUpDate);
+      if (visit.followUpInstructions)
+        pdf.fillColor("#152b29").fontSize(10).text(visit.followUpInstructions);
+    }
+    pdf
+      .moveDown(2)
+      .fontSize(8.5)
+      .fillColor("#647471")
+      .text("Generated from Neuro Spine Care Center Patient Portal · " + new Date().toISOString());
+    pdf.end();
+    res
+      .type("application/pdf")
+      .setHeader(
+        "Content-Disposition",
+        `attachment; filename="Neuro-Spine-Care-Center-Prescription-${visitDate}.pdf"`,
+      );
+    res.send(await finished);
+  });
+
   return r;
 }

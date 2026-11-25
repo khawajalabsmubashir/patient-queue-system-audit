@@ -51,7 +51,7 @@ export const demographicsSchema = z
       "Date of birth cannot be in the future.",
     ),
     gender: z.enum(["", "female", "male", "other", "prefer_not_to_say"]),
-    address: z.string().trim().max(500),
+    address: z.string().trim().max(500).optional(),
     emergencyContactName: z.string().trim().max(120).optional(),
     emergencyContactPhone: z.string().trim().max(30).optional(),
     bloodGroup: z
@@ -173,12 +173,12 @@ export async function saveProfile(
         .run(c.fullName, c.phone, stamp, id);
       await db
         .prepare(
-          "UPDATE patient_profiles SET date_of_birth=?,gender=?,address=?,emergency_contact_name=COALESCE(?,emergency_contact_name),emergency_contact_phone=COALESCE(?,emergency_contact_phone),blood_group=COALESCE(?,blood_group),updated_at=? WHERE user_id=?",
+          "UPDATE patient_profiles SET date_of_birth=?,gender=?,address=COALESCE(?,address),emergency_contact_name=COALESCE(?,emergency_contact_name),emergency_contact_phone=COALESCE(?,emergency_contact_phone),blood_group=COALESCE(?,blood_group),updated_at=? WHERE user_id=?",
         )
         .run(
           c.dateOfBirth,
           c.gender,
-          c.address,
+          c.address ?? null,
           c.emergencyContactName ?? null,
           c.emergencyContactPhone ?? null,
           c.bloodGroup ?? null,
