@@ -41,20 +41,22 @@ export async function primaryDoctor(db: Database) {
   return doctor.id;
 }
 async function configuration(db: Database, clinicId: string) {
-  const clinic = await one<{
-    name: string;
-    active: number;
-    opening_time: string;
-    closing_time: string;
-  }>(db, "SELECT name,active,opening_time,closing_time FROM clinics WHERE id=?", clinicId);
+  const [clinic, doctorId, branding] = await Promise.all([
+    one<{
+      name: string;
+      active: number;
+      opening_time: string;
+      closing_time: string;
+    }>(db, "SELECT name,active,opening_time,closing_time FROM clinics WHERE id=?", clinicId),
+    primaryDoctor(db),
+    one<{ slot_minutes: number }>(
+      db,
+      "SELECT slot_minutes FROM clinic_branding WHERE clinic_id=?",
+      clinicId,
+    ),
+  ]);
   if (!clinic || !clinic.active)
     throw new ApiError(409, "CLINIC_INACTIVE", "Choose an active clinic.");
-  const doctorId = await primaryDoctor(db);
-  const branding = await one<{ slot_minutes: number }>(
-    db,
-    "SELECT slot_minutes FROM clinic_branding WHERE clinic_id=?",
-    clinicId,
-  );
   return { clinic, doctorId, slotMinutes: branding?.slot_minutes ?? 15 };
 }
 export async function doctorSchedule(db: Database, clinicId: string) {
@@ -81,17 +83,6 @@ export async function saveDoctorSchedule(
   const { windows, slotMinutes } = scheduleInput.parse(input);
   return atomic(db, async () => {
     const { clinic, doctorId } = await configuration(db, clinicId);
-    const others = await many<{
-      weekday: number;
-      start_time: string;
-      end_time: string;
-      name: string;
-    }>(
-      db,
-      "SELECT a.weekday,a.start_time,a.end_time,c.name FROM doctor_availability a JOIN clinics c ON c.id=a.clinic_id WHERE a.doctor_user_id=? AND a.clinic_id<>?",
-      doctorId,
-      clinicId,
-    );
     for (const [i, w] of windows.entries()) {
       if (
         w.startTime >= w.endTime ||
@@ -111,15 +102,6 @@ export async function saveDoctorSchedule(
           )
       )
         throw new ApiError(409, "SCHEDULE_CONFLICT", "Doctor hours overlap on the same day.");
-      const conflict = others.find(
-        (x) => x.weekday === w.weekday && x.start_time < w.endTime && x.end_time > w.startTime,
-      );
-      if (conflict)
-        throw new ApiError(
-          409,
-          "SCHEDULE_CONFLICT",
-          `You already work at ${conflict.name} from ${timeLabel(conflict.start_time)} to ${timeLabel(conflict.end_time)} on ${["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][w.weekday]}.`,
-        );
     }
     await db
       .prepare("DELETE FROM doctor_availability WHERE doctor_user_id=? AND clinic_id=?")
@@ -143,31 +125,26 @@ export async function saveDoctorSchedule(
 export async function availableSlots(db: Database, clinicId: string, day: string, exclude = "") {
   availabilityDate.parse(day);
   const { clinic, doctorId, slotMinutes } = await configuration(db, clinicId);
-  if (
-    await one(
+  const [onLeave, booked] = await Promise.all([
+    one(
       db,
       "SELECT id FROM doctor_leave WHERE doctor_user_id=? AND start_date<=? AND end_date>=? LIMIT 1",
       doctorId,
       day,
       day,
-    )
-  )
-    return { slots: [], slotMinutes, timezone: "Asia/Karachi", doctorId };
-  const windows = await many<{ start_time: string; end_time: string }>(
-    db,
-    "SELECT start_time,end_time FROM doctor_availability WHERE doctor_user_id=? AND clinic_id=? AND weekday=? ORDER BY start_time",
-    doctorId,
-    clinicId,
-    new Date(day + "T12:00:00Z").getUTCDay(),
-  );
-  // A single doctor serves every clinic. Legacy appointments retain their clinic duration;
-  // new appointments store a duration snapshot so later settings do not shrink reservations.
-  const booked = await many<{ scheduled_at: string; duration: number }>(
-    db,
-    "SELECT a.scheduled_at,COALESCE(s.duration_minutes,b.slot_minutes,15) duration FROM appointments a LEFT JOIN appointment_slots s ON s.appointment_id=a.id LEFT JOIN clinic_branding b ON b.clinic_id=a.clinic_id LEFT JOIN appointment_workflow w ON w.appointment_id=a.id WHERE a.id<>? AND a.status<>'cancelled' AND COALESCE(w.status,a.status) NOT IN ('cancelled','no_show') AND substr(a.scheduled_at,1,10)=?",
-    exclude,
-    day,
-  );
+    ),
+    // A single doctor serves every clinic. Legacy appointments retain their clinic duration;
+    // new appointments store a duration snapshot so later settings do not shrink reservations.
+    many<{ scheduled_at: string; duration: number }>(
+      db,
+      "SELECT a.scheduled_at,COALESCE(s.duration_minutes,b.slot_minutes,15) duration FROM appointments a LEFT JOIN appointment_slots s ON s.appointment_id=a.id LEFT JOIN clinic_branding b ON b.clinic_id=a.clinic_id LEFT JOIN appointment_workflow w ON w.appointment_id=a.id WHERE a.id<>? AND a.status<>'cancelled' AND COALESCE(w.status,a.status) NOT IN ('cancelled','no_show') AND substr(a.scheduled_at,1,10)=?",
+      exclude,
+      day,
+    ),
+  ]);
+  if (onLeave) return { slots: [], slotMinutes, timezone: "Asia/Karachi", doctorId };
+  // Slots follow the clinic's configured opening and closing times directly so both admins and patients can book.
+  const windows = [{ start_time: clinic.opening_time, end_time: clinic.closing_time }];
   const slots: { value: string; label: string }[] = [];
   for (const w of windows) {
     for (

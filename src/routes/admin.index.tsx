@@ -43,29 +43,18 @@ export function Today() {
           </a>
         }
       />
-      {d.setup !== "ready" ? (
+      {d.setup === "clinic" ? (
         <section className="surface p-6">
-          <h2 className="text-lg font-semibold">
-            {d.setup === "clinic" ? "Add your first clinic" : "Set your doctor schedule"}
-          </h2>
+          <h2 className="text-lg font-semibold">Add your first clinic</h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            {d.setup === "clinic"
-              ? "Add a clinic, set when you are available, then patients can book."
-              : "Set your clinic hours before patients can book appointments."}
+            Add a clinic and configure its opening and closing times so patients can book appointments right away.
           </p>
           <ol className="my-5 space-y-2 text-sm">
-            <li>1. Add clinic</li>
-            <li>2. Set doctor schedule</li>
-            <li>3. Patients can book</li>
+            <li>1. Add clinic &amp; set opening hours</li>
+            <li>2. Patients &amp; staff can book immediately</li>
           </ol>
-          <a
-            href={
-              d.setup === "clinic"
-                ? "/admin/clinics"
-                : "/admin/doctor-schedule?clinicId=" + d.unscheduled[0]?.id
-            }
-          >
-            <Btn>{d.setup === "clinic" ? "Add clinic" : "Set doctor schedule"}</Btn>
+          <a href="/admin/clinics">
+            <Btn>Add clinic</Btn>
           </a>
         </section>
       ) : (
@@ -152,23 +141,13 @@ export function Today() {
                 <span className="text-primary">Continue consultation →</span>
               </a>
             ))}
-            {d.unscheduled.map((c) => (
-              <a
-                key={c.id}
-                href={"/admin/doctor-schedule?clinicId=" + c.id}
-                className="block p-5 text-sm text-primary"
-              >
-                Set schedule for {c.name} →
-              </a>
-            ))}
             {!d.inProgress.length &&
-              !d.unscheduled.length &&
               !next.some((a) => ["scheduled", "confirmed"].includes(a.status)) && (
                 <p className="p-5 text-sm text-muted-foreground">You’re up to date.</p>
               )}
           </section>
-          <a href="/admin/reports" className="mt-6 inline-block text-sm text-primary">
-            View reports and analytics →
+          <a href="/admin/analytics" className="mt-6 inline-block text-sm text-primary">
+            View analytics and exports →
           </a>
         </>
       )}

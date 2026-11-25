@@ -47,10 +47,7 @@ it("patient summary preserves bills and follow-up while omitting documents", asy
   expect(await screen.findByText("Return for review")).toBeInTheDocument();
   expect(screen.queryByText("Released report")).toBeNull();
   expect(screen.getByText("Return for review")).toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /Outstanding bills/ })).toHaveAttribute(
-    "href",
-    "/patient/billing",
-  );
+  expect(screen.queryByRole("link", { name: /Outstanding bills/ })).toBeNull();
   expect(screen.queryByText(/private notes/i)).toBeNull();
 });
 it("command search opens with keyboard and resolves authorized result links", async () => {
@@ -90,6 +87,56 @@ it("operational dashboard uses server totals and provides date controls", async 
   expect(screen.getByText("No appointments in this period.")).toBeInTheDocument();
   await selectOption(screen.getByLabelText("Report period"), "This month");
   await waitFor(() => expect(fixture.api.mock.calls.length).toBeGreaterThan(1));
+});
+it("analytics dashboard renders charts for trend, status breakdown, and clinic comparison", async () => {
+  fixture.api.mockResolvedValue({
+    totals: {
+      patients: 12,
+      appointments: 15,
+      waiting: 3,
+      completed: 9,
+      cancelled: 1,
+      revenue: 45000,
+      outstanding: 2500,
+      documents: 4,
+      followups: 2,
+      averageWait: 11,
+    },
+    clinics: [
+      {
+        id: "northstar",
+        name: "Northstar Clinic",
+        patients: 12,
+        appointments: 15,
+        waiting: 3,
+        completed: 9,
+        cancelled: 1,
+        revenue: 45000,
+        outstanding: 2500,
+        documents: 4,
+        followups: 2,
+        averageWait: 11,
+      },
+    ],
+    trend: [
+      { date: "2026-11-18", visits: 4, revenue: 15000, averageWait: 9 },
+      { date: "2026-11-19", visits: 5, revenue: 30000, averageWait: 13 },
+    ],
+    statuses: [
+      { status: "completed", count: 9 },
+      { status: "scheduled", count: 5 },
+      { status: "cancelled", count: 1 },
+    ],
+  });
+  render(<OperationalReports />);
+  expect(await screen.findByRole("heading", { name: "Analytics" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Patient visits chart" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Average queue wait chart" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Revenue trend chart" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Appointment status chart" })).toBeVisible();
+  expect(screen.getByRole("region", { name: "Clinic comparison chart" })).toBeVisible();
+  expect(screen.getByText(/60%/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Export appointments" })).toBeVisible();
 });
 it("follow-ups expose explicit actions and send audited mutations", async () => {
   const day = new Intl.DateTimeFormat("en-CA", {

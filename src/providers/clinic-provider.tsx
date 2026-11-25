@@ -1,6 +1,7 @@
 import { SelectField } from "@/components/form-controls";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { api } from "@/api/client";
+import { seedClinicalCache } from "@/components/clinical";
 import { useAuth } from "./auth-provider";
 import type { ManagedClinic } from "@/types/local";
 export type ClinicOption = Pick<ManagedClinic, "id" | "name" | "city" | "area"> &
@@ -60,6 +61,7 @@ export function ClinicProvider({
               : "/clinics",
         );
         if (!active) return;
+        if (profile?.role === "admin") seedClinicalCache("/admin/clinics", list);
         setClinics(list);
         setError("");
         setSelected((previous) => {

@@ -23,6 +23,7 @@ import { Route as StaffRouteImport } from './routes/staff'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as AdminAccountRouteImport } from './routes/admin.account'
 import { Route as AdminActivityRouteImport } from './routes/admin.activity'
+import { Route as AdminAnalyticsRouteImport } from './routes/admin.analytics'
 import { Route as AdminAppointmentsRouteImport } from './routes/admin.appointments'
 import { Route as AdminBillingRouteImport } from './routes/admin.billing'
 import { Route as AdminBrandingRouteImport } from './routes/admin.branding'
@@ -126,6 +127,11 @@ const AdminAccountRoute = AdminAccountRouteImport.update({
 const AdminActivityRoute = AdminActivityRouteImport.update({
   id: '/activity',
   path: '/activity',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminAnalyticsRoute = AdminAnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAppointmentsRoute = AdminAppointmentsRouteImport.update({
@@ -316,6 +322,7 @@ export interface FileRoutesByFullPath {
   '/staff': typeof StaffRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/appointments': typeof AdminAppointmentsRoute
   '/admin/billing': typeof AdminBillingRoute
   '/admin/branding': typeof AdminBrandingRoute
@@ -364,6 +371,7 @@ export interface FileRoutesByTo {
   '/staff': typeof StaffRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/appointments': typeof AdminAppointmentsRoute
   '/admin/billing': typeof AdminBillingRoute
   '/admin/branding': typeof AdminBrandingRoute
@@ -415,6 +423,7 @@ export interface FileRoutesById {
   '/staff': typeof StaffRoute
   '/admin/account': typeof AdminAccountRoute
   '/admin/activity': typeof AdminActivityRoute
+  '/admin/analytics': typeof AdminAnalyticsRoute
   '/admin/appointments': typeof AdminAppointmentsRoute
   '/admin/billing': typeof AdminBillingRoute
   '/admin/branding': typeof AdminBrandingRoute
@@ -467,6 +476,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/admin/account'
     | '/admin/activity'
+    | '/admin/analytics'
     | '/admin/appointments'
     | '/admin/billing'
     | '/admin/branding'
@@ -515,6 +525,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/admin/account'
     | '/admin/activity'
+    | '/admin/analytics'
     | '/admin/appointments'
     | '/admin/billing'
     | '/admin/branding'
@@ -565,6 +576,7 @@ export interface FileRouteTypes {
     | '/staff'
     | '/admin/account'
     | '/admin/activity'
+    | '/admin/analytics'
     | '/admin/appointments'
     | '/admin/billing'
     | '/admin/branding'
@@ -714,6 +726,13 @@ declare module '@tanstack/react-router' {
       path: '/activity'
       fullPath: '/admin/activity'
       preLoaderRoute: typeof AdminActivityRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/analytics': {
+      id: '/admin/analytics'
+      path: '/analytics'
+      fullPath: '/admin/analytics'
+      preLoaderRoute: typeof AdminAnalyticsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/appointments': {
@@ -960,6 +979,7 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAccountRoute: typeof AdminAccountRoute
   AdminActivityRoute: typeof AdminActivityRoute
+  AdminAnalyticsRoute: typeof AdminAnalyticsRoute
   AdminAppointmentsRoute: typeof AdminAppointmentsRoute
   AdminBillingRoute: typeof AdminBillingRoute
   AdminBrandingRoute: typeof AdminBrandingRoute
@@ -984,6 +1004,7 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAccountRoute: AdminAccountRoute,
   AdminActivityRoute: AdminActivityRoute,
+  AdminAnalyticsRoute: AdminAnalyticsRoute,
   AdminAppointmentsRoute: AdminAppointmentsRoute,
   AdminBillingRoute: AdminBillingRoute,
   AdminBrandingRoute: AdminBrandingRoute,

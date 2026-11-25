@@ -17,6 +17,23 @@ import { NotificationCenter } from "@/components/notification-center";
 import { AppointmentStatusBadge } from "@/components/appointment-tokens";
 import { formatDateOnly, formatDateTime } from "@/domain/date-format";
 import { Search } from "lucide-react";
+import {
+  Area,
+  AreaChart,
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Legend,
+  Line,
+  LineChart,
+  Pie,
+  PieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 
 type Metrics = {
   patients: number;
@@ -50,7 +67,30 @@ const today = () =>
     day: "2-digit",
   }).format(new Date());
 const inputClass = "mt-1 block w-full rounded-lg border border-input bg-card p-2.5 text-sm";
-export function OperationalReports({ reports = false }: { reports?: boolean }) {
+const STATUS_COLORS: Record<string, string> = {
+  scheduled: "#0f766e",
+  confirmed: "#0ea5e9",
+  checked_in: "#6366f1",
+  completed: "#10b981",
+  cancelled: "#ef4444",
+  no_show: "#f59e0b",
+};
+
+const CHART_PALETTE = ["#0f766e", "#0ea5e9", "#10b981", "#f59e0b", "#6366f1", "#ef4444"];
+
+const formatShortDay = (isoDate: string) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(isoDate)) return isoDate;
+  const [, month, day] = isoDate.split("-");
+  return `${day}/${month}`;
+};
+
+const formatCompactMoney = (value: number) => {
+  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(1)}M`;
+  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(0)}k`;
+  return String(value);
+};
+
+export function OperationalAnalytics({ reports = false }: { reports?: boolean }) {
   const { selected } = useClinicContext(),
     [from, setFrom] = useState(today),
     [to, setTo] = useState(today),
@@ -101,11 +141,23 @@ export function OperationalReports({ reports = false }: { reports?: boolean }) {
     averageWait: "Average wait (min)",
   };
   const data = remote.data;
+  const totalStatuses = (data?.statuses ?? []).reduce((sum, item) => sum + item.count, 0);
+  const clinicChartData = (data?.clinics ?? []).map((c) => ({
+    name: c.name.length > 18 ? c.name.slice(0, 16) + "…" : c.name,
+    fullName: c.name,
+    Appointments: c.appointments,
+    Completed: c.completed,
+    Waiting: c.waiting,
+  }));
+  const trendChartData = (data?.trend ?? []).map((t) => ({
+    ...t,
+    label: formatShortDay(t.date),
+  }));
   return (
     <>
       <PageHeader
-        title={reports ? "Reports & data management" : "Operational overview"}
-        sub="Real clinic activity. Dates use clinic local time; revenue reflects payments received."
+        title="Analytics"
+        sub="Visual clinic trends, queue throughput, appointment breakdown, and operational exports."
       />
       <div className="surface mb-6 flex flex-wrap items-end gap-3 p-4 print:hidden">
         <label className="text-sm">
@@ -124,32 +176,33 @@ export function OperationalReports({ reports = false }: { reports?: boolean }) {
         </label>
         <Field label="From" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         <Field label="To" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-        {reports && (
-          <label className="text-sm">
-            Status
-            <SelectField
-              className={inputClass}
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">All statuses</option>
-              {[
-                "scheduled",
-                "confirmed",
-                "checked_in",
-                "completed",
-                "cancelled",
-                "no_show",
-                "unpaid",
-                "partially_paid",
-                "paid",
-                "void",
-              ].map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </SelectField>
-          </label>
-        )}
+        <label className="text-sm">
+          Status
+          <SelectField
+            aria-label="Status filter"
+            className={inputClass}
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+          >
+            <option value="">All statuses</option>
+            {[
+              "scheduled",
+              "confirmed",
+              "checked_in",
+              "completed",
+              "cancelled",
+              "no_show",
+              "unpaid",
+              "partially_paid",
+              "paid",
+              "void",
+            ].map((x) => (
+              <option key={x} value={x}>
+                {x.replaceAll("_", " ")}
+              </option>
+            ))}
+          </SelectField>
+        </label>
         <Btn variant="secondary" onClick={remote.reload}>
           Refresh
         </Btn>
@@ -173,124 +226,285 @@ export function OperationalReports({ reports = false }: { reports?: boolean }) {
               </div>
             ))}
           </dl>
-          <p className="mb-4 text-xs text-muted-foreground">
-            Waiting is current today. Outstanding includes all issued unpaid balances. Follow-ups
-            include overdue recommendations.
+          <p className="mb-5 text-xs text-muted-foreground">
+            Waiting is current today. Dates use clinic local time (Asia/Karachi).
           </p>
-          <section className="surface mb-6 overflow-x-auto p-5">
-            <h2 className="mb-4 font-semibold">Clinic comparison</h2>
-            <table className="w-full text-left text-sm">
-              <thead>
-                <tr>
-                  {["Clinic", "Appointments", "Waiting", "Completed", "Revenue", "Outstanding"].map(
-                    (x) => (
-                      <th className="p-2" key={x}>
-                        {x}
-                      </th>
-                    ),
-                  )}
-                </tr>
-              </thead>
-              <tbody>
-                {data.clinics.map((c) => (
-                  <tr key={c.id} className="border-t border-border">
-                    <th className="p-2 font-medium">{c.name}</th>
-                    {[
-                      c.appointments,
-                      c.waiting,
-                      c.completed,
-                      money(c.revenue),
-                      money(c.outstanding),
-                    ].map((x, i) => (
-                      <td className="p-2" key={i}>
-                        {x}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            {!data.clinics.length && <p>No clinics found.</p>}
-          </section>
-          <div className="grid gap-4 md:grid-cols-2">
-            {(["visits", "revenue", "averageWait"] as const).map((metric) => (
-              <section className="surface min-w-0 p-5" key={metric}>
-                <h2 className="mb-4 font-semibold">
-                  {metric === "visits"
-                    ? "Patient visits"
-                    : metric === "revenue"
-                      ? "Revenue trend"
-                      : "Average queue wait (minutes)"}
-                </h2>
-                {data.trend.length ? (
-                  data.trend.map((t) => (
-                    <div className="mb-3 text-xs" key={t.date}>
-                      <div className="mb-1 flex justify-between gap-2">
-                        <span>{t.date}</span>
-                        <span>{metric === "revenue" ? money(t[metric]) : t[metric]}</span>
-                      </div>
-                      <meter
-                        aria-label={t.date + " " + metric}
-                        className="h-3 w-full accent-primary"
-                        min={0}
-                        max={Math.max(1, ...data.trend.map((x) => x[metric]))}
-                        value={t[metric]}
+
+          <div className="grid gap-5 lg:grid-cols-2">
+            {/* Patient visits chart */}
+            <section className="surface min-w-0 p-5" aria-label="Patient visits chart">
+              <div className="mb-4 flex items-baseline justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold">Patient visits</h2>
+                  <p className="text-xs text-muted-foreground">Daily consultations in selected range</p>
+                </div>
+                <span className="tabular-nums text-sm font-semibold text-primary">
+                  {data.totals.completed} completed
+                </span>
+              </div>
+              {trendChartData.length ? (
+                <div className="h-60 w-full min-w-0">
+                  <ResponsiveContainer width="100%" height={240} initialDimension={{ width: 480, height: 240 }}>
+                    <AreaChart data={trendChartData} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
+                      <defs>
+                        <linearGradient id="visitsFill" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#0f766e" stopOpacity={0.28} />
+                          <stop offset="95%" stopColor="#0f766e" stopOpacity={0.02} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#64748b" />
+                      <Tooltip
+                        formatter={(value: number) => [value, "Visits"]}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.date ?? label}
                       />
-                    </div>
-                  ))
-                ) : (
-                  <p className="text-sm text-muted-foreground">No activity in this period.</p>
-                )}
-              </section>
-            ))}
-            <section className="surface p-5">
-              <h2 className="mb-4 font-semibold">Appointment status</h2>
+                      <Area
+                        type="monotone"
+                        dataKey="visits"
+                        stroke="#0f766e"
+                        strokeWidth={2.5}
+                        fill="url(#visitsFill)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No activity in this period.</p>
+              )}
+            </section>
+
+            {/* Average queue wait chart */}
+            <section className="surface min-w-0 p-5" aria-label="Average queue wait chart">
+              <div className="mb-4 flex items-baseline justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold">Average queue wait (minutes)</h2>
+                  <p className="text-xs text-muted-foreground">Mean minutes from token issue to call</p>
+                </div>
+                <span className="tabular-nums text-sm font-semibold text-foreground">
+                  {data.totals.averageWait} min avg
+                </span>
+              </div>
+              {trendChartData.length ? (
+                <div className="h-60 w-full min-w-0">
+                  <ResponsiveContainer width="100%" height={240} initialDimension={{ width: 480, height: 240 }}>
+                    <LineChart data={trendChartData} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#64748b" />
+                      <Tooltip
+                        formatter={(value: number) => [`${value} min`, "Avg wait"]}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.date ?? label}
+                      />
+                      <Line
+                        type="monotone"
+                        dataKey="averageWait"
+                        stroke="#0ea5e9"
+                        strokeWidth={2.5}
+                        dot={{ r: 3.5, fill: "#0ea5e9" }}
+                        activeDot={{ r: 5 }}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No activity in this period.</p>
+              )}
+            </section>
+
+            {/* Revenue trend chart */}
+            <section className="surface min-w-0 p-5" aria-label="Revenue trend chart">
+              <div className="mb-4 flex items-baseline justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold">Revenue trend</h2>
+                  <p className="text-xs text-muted-foreground">Daily collected consultation revenue</p>
+                </div>
+                <span className="tabular-nums text-sm font-semibold text-foreground">
+                  {money(data.totals.revenue)}
+                </span>
+              </div>
+              {trendChartData.length ? (
+                <div className="h-60 w-full min-w-0">
+                  <ResponsiveContainer width="100%" height={240} initialDimension={{ width: 480, height: 240 }}>
+                    <BarChart data={trendChartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
+                      <YAxis
+                        tickFormatter={(val: number) => formatCompactMoney(val)}
+                        tick={{ fontSize: 12 }}
+                        stroke="#64748b"
+                      />
+                      <Tooltip
+                        formatter={(value: number) => [money(value), "Revenue"]}
+                        labelFormatter={(label, payload) => payload?.[0]?.payload?.date ?? label}
+                      />
+                      <Bar dataKey="revenue" fill="#10b981" radius={[6, 6, 0, 0]} maxBarSize={42} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">No activity in this period.</p>
+              )}
+            </section>
+
+            {/* Appointment status breakdown chart */}
+            <section className="surface min-w-0 p-5" aria-label="Appointment status chart">
+              <div className="mb-4 flex items-baseline justify-between gap-2">
+                <div>
+                  <h2 className="font-semibold">Appointment status</h2>
+                  <p className="text-xs text-muted-foreground">Distribution across booking states</p>
+                </div>
+                <span className="tabular-nums text-sm font-semibold text-foreground">
+                  {data.totals.appointments} total
+                </span>
+              </div>
               {data.statuses.length ? (
-                data.statuses.map((s) => (
-                  <div className="mb-3 text-sm" key={s.status}>
-                    <div className="flex justify-between">
-                      <span>{s.status.replaceAll("_", " ")}</span>
-                      <span>{s.count}</span>
-                    </div>
-                    <meter
-                      aria-label={s.status}
-                      className="h-3 w-full"
-                      min={0}
-                      max={Math.max(1, data.totals.appointments)}
-                      value={s.count}
-                    />
+                <div className="grid items-center gap-4 sm:grid-cols-[1fr_1.1fr]">
+                  <div className="h-56 w-full min-w-0">
+                    <ResponsiveContainer width="100%" height={224} initialDimension={{ width: 260, height: 224 }}>
+                      <PieChart>
+                        <Pie
+                          data={data.statuses}
+                          dataKey="count"
+                          nameKey="status"
+                          innerRadius={52}
+                          outerRadius={82}
+                          paddingAngle={2}
+                        >
+                          {data.statuses.map((entry, index) => (
+                            <Cell
+                              key={entry.status}
+                              fill={
+                                STATUS_COLORS[entry.status] ??
+                                CHART_PALETTE[index % CHART_PALETTE.length]!
+                              }
+                            />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          formatter={(value: number, name: string) => [
+                            value,
+                            String(name).replaceAll("_", " "),
+                          ]}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
                   </div>
-                ))
+                  <ul className="space-y-2.5 text-sm">
+                    {data.statuses.map((s, index) => {
+                      const pct = totalStatuses
+                        ? Math.round((s.count / totalStatuses) * 100)
+                        : 0;
+                      const color =
+                        STATUS_COLORS[s.status] ?? CHART_PALETTE[index % CHART_PALETTE.length]!;
+                      return (
+                        <li key={s.status} className="flex items-center justify-between gap-3">
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span
+                              className="size-2.5 shrink-0 rounded-full"
+                              style={{ backgroundColor: color }}
+                              aria-hidden="true"
+                            />
+                            <span className="truncate capitalize">
+                              {s.status.replaceAll("_", " ")}
+                            </span>
+                          </span>
+                          <span className="tabular-nums shrink-0 font-medium text-foreground">
+                            {s.count}{" "}
+                            <span className="text-xs text-muted-foreground">({pct}%)</span>
+                          </span>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                </div>
               ) : (
                 <p className="text-sm text-muted-foreground">No appointments in this period.</p>
               )}
             </section>
           </div>
-          {reports && (
-            <section className="surface mt-6 space-y-4 p-6">
-              <h2 className="font-semibold">Operational CSV exports</h2>
-              <div className="flex flex-wrap gap-2">
-                {["patients", "appointments", "visits", "billing", "payments"].map((k) => (
-                  <Btn key={k} variant="secondary" onClick={() => void download(k)}>
-                    Export {k}
-                  </Btn>
-                ))}
+
+          {/* Clinic comparison bar chart + compact table */}
+          <section className="surface mt-6 min-w-0 p-5" aria-label="Clinic comparison chart">
+            <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+              <div>
+                <h2 className="font-semibold">Clinic comparison</h2>
+                <p className="text-xs text-muted-foreground">
+                  Side-by-side appointments, completed visits, and active waiting across clinics
+                </p>
               </div>
-              <p className="text-sm text-muted-foreground">
-                Authorized exports exclude private clinical notes and file URLs. Exports are
-                audited. For a full encrypted backup, use Supabase database backup tools and back up
-                private Storage separately; credentials stay outside this application.
-              </p>
-              <a href="/admin/data-management" className="text-sm text-primary underline">
-                Data management and email delivery
-              </a>
-            </section>
-          )}
+            </div>
+            {clinicChartData.length ? (
+              <>
+                <div className="mb-6 h-64 w-full min-w-0">
+                  <ResponsiveContainer width="100%" height={256} initialDimension={{ width: 640, height: 256 }}>
+                    <BarChart data={clinicChartData} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                      <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#64748b" />
+                      <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#64748b" />
+                      <Tooltip labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""} />
+                      <Legend wrapperStyle={{ fontSize: 12 }} />
+                      <Bar dataKey="Appointments" fill="#0f766e" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                      <Bar dataKey="Completed" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                      <Bar dataKey="Waiting" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead>
+                      <tr>
+                        {["Clinic", "Appointments", "Waiting", "Completed", "Avg wait", "Revenue"].map(
+                          (x) => (
+                            <th className="p-2 text-xs font-semibold text-muted-foreground" key={x}>
+                              {x}
+                            </th>
+                          ),
+                        )}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.clinics.map((c) => (
+                        <tr key={c.id} className="border-t border-border">
+                          <th className="p-2 font-medium">{c.name}</th>
+                          <td className="tabular-nums p-2">{c.appointments}</td>
+                          <td className="tabular-nums p-2">{c.waiting}</td>
+                          <td className="tabular-nums p-2">{c.completed}</td>
+                          <td className="tabular-nums p-2">{c.averageWait} min</td>
+                          <td className="tabular-nums p-2">{money(c.revenue)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">No clinics found.</p>
+            )}
+          </section>
+
+          <section className="surface mt-6 space-y-4 p-6 print:hidden">
+            <h2 className="font-semibold">Operational CSV exports</h2>
+            <div className="flex flex-wrap gap-2">
+              {["patients", "appointments", "visits", "billing", "payments"].map((k) => (
+                <Btn key={k} variant="secondary" onClick={() => void download(k)}>
+                  Export {k}
+                </Btn>
+              ))}
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Authorized exports exclude private clinical notes and file URLs. Exports are audited.
+            </p>
+            <a href="/admin/data-management" className="text-sm text-primary underline">
+              Data management and email delivery
+            </a>
+          </section>
         </>
       )}
     </>
   );
 }
+export const OperationalReports = OperationalAnalytics;
 export function GlobalSearch() {
   const [open, setOpen] = useState(false),
     [term, setTerm] = useState(""),
@@ -825,9 +1039,7 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
   const scopedFollowups = [...d.followups]
     .filter((f) => !activeClinicId || !f.clinic_id || f.clinic_id === activeClinicId)
     .sort((a, b) => String(a.follow_up_date).localeCompare(String(b.follow_up_date)));
-  const unpaidCount = Number(d.bills.unpaid_count ?? 0);
-  const hasBalance = Number(d.bills.balance) > 0;
-  const hasSummaryGrid = Boolean(latestVisit || latestPrescription || hasBalance);
+  const hasSummaryGrid = Boolean(latestVisit || latestPrescription);
   const hasCareData = hasSummaryGrid || scopedFollowups.length > 0;
 
   return (
@@ -875,7 +1087,7 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
       )}
       {hasSummaryGrid && (
         <div className="surface p-5">
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid gap-3 sm:grid-cols-2">
             {latestVisit && (
               <a
                 href="/patient/visits"
@@ -920,29 +1132,7 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
               </a>
             )}
 
-            {hasBalance && (
-              <a
-                href="/patient/billing"
-                className="group flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4 transition hover:border-primary/40 hover:bg-card"
-              >
-                <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-                    Outstanding bills
-                  </p>
-                  <p className="tabular-nums mt-2 text-base font-semibold text-foreground">
-                    {money(d.bills.balance)}
-                  </p>
-                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                    {unpaidCount > 0
-                      ? `${unpaidCount} ${unpaidCount === 1 ? "invoice unpaid" : "invoices unpaid"}`
-                      : "1 invoice unpaid"}
-                  </p>
-                </div>
-                <span className="mt-4 text-xs font-medium text-primary group-hover:underline">
-                  View invoice →
-                </span>
-              </a>
-            )}
+
           </div>
         </div>
       )}
@@ -1027,8 +1217,8 @@ export function DataManagement() {
         sub="Admin-only operational exports and application email status."
       />
       <div className="surface space-y-4 p-6">
-        <a className="text-primary underline" href="/admin/reports">
-          Open reports and CSV exports
+        <a className="text-primary underline" href="/admin/analytics">
+          Open analytics and CSV exports
         </a>
         <p className="text-sm">
           Full backups: use Supabase database backups or an authenticated CLI pg_dump on a trusted

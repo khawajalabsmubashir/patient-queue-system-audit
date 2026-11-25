@@ -317,7 +317,7 @@ describe("Audit fixes verification", () => {
     fireEvent.keyDown(recordsTrigger, { key: "Enter", code: "Enter" });
     expect(await screen.findByRole("menuitem", { name: /My visits/i })).toBeVisible();
     expect(screen.getByRole("menuitem", { name: /Prescriptions/i })).toBeVisible();
-    expect(screen.getByRole("menuitem", { name: /Billing/i })).toBeVisible();
+    expect(screen.queryByRole("menuitem", { name: /Billing/i })).toBeNull();
     expect(document.body.style.overflow).toBe("");
     expect(document.body.hasAttribute("data-scroll-locked")).toBe(false);
     fireEvent.keyDown(recordsTrigger, { key: "Escape" });
@@ -904,9 +904,10 @@ describe("Audit fixes verification", () => {
     expect(await screen.findByText("HP-001")).toBeVisible();
     expect(screen.getByText("Confirmed")).toBeVisible();
     expect(screen.getByText("Scheduled")).toBeVisible();
-    // Care summary 3 cards + Follow-up Pending pill
+    // Care summary excludes Billing card while preserving clinical cards + Follow-up Pending pill
     expect(await screen.findByRole("heading", { name: "Care summary" })).toBeVisible();
-    expect(screen.getByText("1 invoice unpaid")).toBeVisible();
+    expect(screen.queryByText("1 invoice unpaid")).toBeNull();
+    expect(screen.queryByText("Outstanding bills")).toBeNull();
     expect(screen.getByText("Pending")).toBeVisible();
     // BUG-034: Live queue card uses order-first on mobile and Before you arrive renders numbered steps
     const liveQueueRegion = screen.getByRole("heading", { name: "Live queue" }).closest("section")!;
@@ -951,6 +952,18 @@ describe("Audit fixes verification", () => {
     const layoutRoot = container.firstElementChild as HTMLElement;
     expect(layoutRoot.className).toContain("overflow-x-clip");
     expect(layoutRoot.className).toContain("max-w-full");
+
+    // Issue 16: Smartphone Admin header hides logo icon (<sm) while preserving tablet/sidebar logo
+    const headerEl = container.querySelector("header")!;
+    const headerLogo = within(headerEl).getByText("Neuro Spine Care Center").parentElement!;
+    expect(headerLogo.className).toContain("hidden");
+    expect(headerLogo.className).toContain("sm:flex");
+
+    // Issue 16: Admin sidebar removes Billing & Doctor Schedule and replaces Reports with Analytics
+    expect(screen.queryByRole("link", { name: /^Billing$/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Doctor Schedule$/i })).toBeNull();
+    expect(screen.queryByRole("link", { name: /^Reports$/i })).toBeNull();
+    expect(screen.getByRole("link", { name: /^Analytics$/i })).toHaveAttribute("href", "/admin/analytics");
 
     const mainEl = container.querySelector("main") as HTMLElement;
     expect(mainEl.className).toContain("min-w-0");

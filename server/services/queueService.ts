@@ -156,30 +156,30 @@ export async function publicQueue(
 ): Promise<PublicQueue> {
   const c = await clinicValue(db, clinicId),
     q = await currentQueue(db, clinicId, day);
-  const waiting = q
-    ? await many<{ token_code: string; queue_order: number }>(
-        db,
-        "SELECT t.token_code,ROW_NUMBER() OVER(ORDER BY a.scheduled_at,t.id) queue_order FROM tokens t JOIN appointments a ON a.id=t.appointment_id JOIN clinics c ON c.id=a.clinic_id WHERE t.queue_id=? AND t.status='waiting' AND a.status='scheduled' AND c.active=1 ORDER BY a.scheduled_at,t.id LIMIT 999",
-        q.id,
-      )
-    : [];
-  const serving = q
-    ? await one<{ token_code: string }>(
-        db,
-        "SELECT t.token_code FROM tokens t JOIN appointments a ON a.id=t.appointment_id JOIN clinics c ON c.id=a.clinic_id WHERE t.queue_id=? AND t.status='serving' AND a.status='scheduled' AND c.active=1",
-        q.id,
-      )
-    : undefined;
-  const updated =
-    (
-      await one<{ stamp: string }>(
-        db,
-        "SELECT MAX(stamp) AS stamp FROM (SELECT updated_at AS stamp FROM clinics WHERE id=? UNION ALL SELECT updated_at AS stamp FROM daily_queues WHERE clinic_id=? UNION ALL SELECT t.updated_at AS stamp FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE q.clinic_id=?) AS updates",
-        clinicId,
-        clinicId,
-        clinicId,
-      )
-    )?.stamp ?? new Date().toISOString();
+  const [waiting, serving, updatedRow] = await Promise.all([
+    q
+      ? many<{ token_code: string; queue_order: number }>(
+          db,
+          "SELECT t.token_code,ROW_NUMBER() OVER(ORDER BY a.scheduled_at,t.id) queue_order FROM tokens t JOIN appointments a ON a.id=t.appointment_id JOIN clinics c ON c.id=a.clinic_id WHERE t.queue_id=? AND t.status='waiting' AND a.status='scheduled' AND c.active=1 ORDER BY a.scheduled_at,t.id LIMIT 999",
+          q.id,
+        )
+      : Promise.resolve([]),
+    q
+      ? one<{ token_code: string }>(
+          db,
+          "SELECT t.token_code FROM tokens t JOIN appointments a ON a.id=t.appointment_id JOIN clinics c ON c.id=a.clinic_id WHERE t.queue_id=? AND t.status='serving' AND a.status='scheduled' AND c.active=1",
+          q.id,
+        )
+      : Promise.resolve(undefined),
+    one<{ stamp: string }>(
+      db,
+      "SELECT MAX(stamp) AS stamp FROM (SELECT updated_at AS stamp FROM clinics WHERE id=? UNION ALL SELECT updated_at AS stamp FROM daily_queues WHERE clinic_id=? UNION ALL SELECT t.updated_at AS stamp FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE q.clinic_id=?) AS updates",
+      clinicId,
+      clinicId,
+      clinicId,
+    ),
+  ]);
+  const updated = updatedRow?.stamp ?? new Date().toISOString();
   return {
     name: c.name,
     displayName: c.publicDisplayName,
@@ -250,40 +250,37 @@ export async function adminState(
   queueDate = date,
 ) {
   const all = clinicId === "all";
-  const q = all ? undefined : await currentQueue(db, clinicId, queueDate);
-  const history = (
-    await many<TokenRow>(
+  const [q, historyRows, patientUsers, latestVisits, clinic, pub] = await Promise.all([
+    all ? Promise.resolve(undefined) : currentQueue(db, clinicId, queueDate),
+    many<TokenRow>(
       db,
       tokenSelect +
         " WHERE (?='all' OR q.clinic_id=?) AND q.queue_date=? ORDER BY t.joined_at DESC,t.queue_order LIMIT 200",
       clinicId,
       clinicId,
       date,
-    )
-  ).map(tokenValue);
-  const patients: PatientRow[] = await Promise.all(
-    (
-      await many<UserRow>(
-        db,
-        "SELECT u.* FROM users u WHERE u.role='patient' AND NOT EXISTS (SELECT 1 FROM staff_profiles sp WHERE sp.user_id=u.id) AND (?='all' OR EXISTS (SELECT 1 FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE t.patient_id=u.id AND q.clinic_id=?)) ORDER BY full_name LIMIT 200",
-        clinicId,
-        clinicId,
-      )
-    ).map(async (u) => {
-      const visit = await one<TokenRow>(
-        db,
-        tokenSelect +
-          " WHERE t.patient_id=? AND (?='all' OR q.clinic_id=?) ORDER BY t.joined_at DESC,t.rowid DESC LIMIT 1",
-        u.id,
-        clinicId,
-        clinicId,
-      );
-      return {
-        user: { id: u.id, fullName: u.full_name, phone: u.phone },
-        visit: visit ? tokenValue(visit) : null,
-      };
-    }),
-  );
+    ),
+    many<UserRow>(
+      db,
+      "SELECT u.* FROM users u WHERE u.role='patient' AND NOT EXISTS (SELECT 1 FROM staff_profiles sp WHERE sp.user_id=u.id) AND (?='all' OR EXISTS (SELECT 1 FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE t.patient_id=u.id AND q.clinic_id=?)) ORDER BY full_name LIMIT 200",
+      clinicId,
+      clinicId,
+    ),
+    many<TokenRow>(
+      db,
+      "SELECT * FROM (SELECT t.*,a.scheduled_at,ROW_NUMBER() OVER(PARTITION BY t.queue_id ORDER BY a.scheduled_at,t.id) appointment_order,u.full_name,u.phone,q.queue_date,q.clinic_id,c.name clinic_name,ROW_NUMBER() OVER(PARTITION BY t.patient_id ORDER BY t.joined_at DESC,t.rowid DESC) patient_rn FROM tokens t JOIN users u ON u.id=t.patient_id JOIN daily_queues q ON q.id=t.queue_id JOIN clinics c ON c.id=q.clinic_id LEFT JOIN appointments a ON a.id=t.appointment_id WHERE (?='all' OR q.clinic_id=?)) ranked WHERE patient_rn=1",
+      clinicId,
+      clinicId,
+    ),
+    clinicValue(db, all ? "northstar" : clinicId),
+    publicQueue(db, all ? "northstar" : clinicId, queueDate),
+  ]);
+  const history = historyRows.map(tokenValue);
+  const visitByPatient = new Map(latestVisits.map((v) => [v.patient_id, tokenValue(v)]));
+  const patients: PatientRow[] = patientUsers.map((u) => ({
+    user: { id: u.id, fullName: u.full_name, phone: u.phone },
+    visit: visitByPatient.get(u.id) ?? null,
+  }));
   const queue = q ? await queueTokens(db, q.id) : [];
   const visits = queue.length
     ? await many<{ id: string; token_id: string }>(
@@ -298,15 +295,19 @@ export async function adminState(
     const visit = visits.find((v) => v.token_id === t.id);
     return { ...t, ...(visit ? { visitId: visit.id, visitStatus: "in_progress" } : {}) };
   });
+  const [queueWithAttention, historyWithAttention] = await Promise.all([
+    withAppointmentAttention(db, queueWithVisits, (t) => t.appointmentId),
+    withAppointmentAttention(db, history, (t) => t.appointmentId),
+  ]);
   return {
-    clinic: await clinicValue(db, all ? "northstar" : clinicId),
+    clinic,
     public: {
-      ...(await publicQueue(db, all ? "northstar" : clinicId, queueDate)),
+      ...pub,
       ...(all ? { status: "unavailable" as const } : {}),
     },
     mine: null,
-    queue: await withAppointmentAttention(db, queueWithVisits, (t) => t.appointmentId),
-    history: await withAppointmentAttention(db, history, (t) => t.appointmentId),
+    queue: queueWithAttention,
+    history: historyWithAttention,
     patients,
   };
 }

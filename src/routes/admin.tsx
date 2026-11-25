@@ -5,8 +5,8 @@ import { useAuth } from "@/providers/auth-provider";
 import { logout } from "@/services/auth";
 import { runAction } from "@/services/queue";
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
-import { useState } from "react";
-import { History, LayoutGrid, ListOrdered, Monitor, Settings, Users, Menu, LogOut, ShieldCheck } from "lucide-react";
+import { useEffect, useState } from "react";
+import { BarChart3, History, LayoutGrid, ListOrdered, Monitor, Users, Menu, LogOut, ShieldCheck } from "lucide-react";
 import { Logo, LiveDot } from "@/components/qc";
 import { useQueue } from "@/lib/queue-store";
 import { cn } from "@/lib/utils";
@@ -46,10 +46,8 @@ const nav = [
   { to: "/admin/patients", label: "Patients", icon: Users },
   { to: "/admin/medicine-library", label: "Medicine Library", icon: ListOrdered },
   { to: "/admin/clinics", label: "Clinics", icon: LayoutGrid },
-  { to: "/admin/doctor-schedule", label: "Doctor Schedule", icon: History },
   { to: "/admin/staff", label: "Staff", icon: Users },
-  { to: "/admin/billing", label: "Billing", icon: ListOrdered },
-  { to: "/admin/reports", label: "Reports", icon: Settings },
+  { to: "/admin/analytics", label: "Analytics", icon: BarChart3 },
 ] as const;
 
 function prefetchAdminRoute(to: string, selected: string) {
@@ -71,15 +69,19 @@ function prefetchAdminRoute(to: string, selected: string) {
     case "/admin/clinics":
       prefetchClinicalData("/admin/clinics");
       break;
-    case "/admin/doctor-schedule":
-      if (selected !== "all") prefetchClinicalData(`/admin/doctor-availability?clinicId=${clinic}`);
-      break;
     case "/admin/staff":
       prefetchClinicalData("/admin/staff");
       break;
-    case "/admin/billing":
-      prefetchClinicalData(`/billing/invoices?clinicId=${clinic}`);
+    case "/admin/analytics": {
+      const todayStr = new Intl.DateTimeFormat("en-CA", {
+        timeZone: "Asia/Karachi",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+      }).format(new Date());
+      prefetchClinicalData(`/admin/analytics?clinicId=${clinic}&from=${todayStr}&to=${todayStr}&status=`);
       break;
+    }
   }
 }
 
@@ -137,6 +139,13 @@ function AdminLayoutContent() {
   const { open, clinic, queueDate } = useQueue();
   const { pathname } = useLocation();
   const [menu, setMenu] = useState(false);
+  useEffect(() => {
+    if (!selected || profile?.role !== "admin") return;
+    const clinicParam = encodeURIComponent(selected);
+    prefetchClinicalData(`/admin/today?clinicId=${clinicParam}`);
+    prefetchClinicalData(`/admin/appointment-flow?clinicId=${clinicParam}`);
+    prefetchClinicalData("/admin/clinics");
+  }, [selected, profile?.role]);
   const [confirmLogout, setConfirmLogout] = useState(false);
   const date = new Date(`${queueDate}T12:00:00`).toLocaleDateString("en-US", {
     weekday: "long",
@@ -195,7 +204,7 @@ function AdminLayoutContent() {
             >
               <Menu className="size-5" />
             </button>
-            <Logo className="shrink-0 [&>span]:hidden sm:[&>span]:inline lg:hidden" />
+            <Logo className="hidden shrink-0 sm:flex lg:hidden" />
             <div className="hidden min-w-0 shrink-0 text-sm lg:block">
               <span className="font-medium">{selected === "all" ? "All Clinics" : clinic.name}</span>
               <span className="ml-3 text-muted-foreground">{date}</span>

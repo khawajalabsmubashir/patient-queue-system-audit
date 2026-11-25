@@ -2,37 +2,39 @@ import { groupClinicLocations, normalizeLocation } from "@/domain/locations";
 import { ConfirmAction } from "@/components/queue-feedback";
 import { SearchableChoice } from "@/components/searchable-choice";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { api } from "@/api/client";
 import { useAuth } from "@/providers/auth-provider";
 import { useClinicContext } from "@/providers/clinic-provider";
+import {
+  ClinicalLoading,
+  invalidateClinicalCache,
+  useClinicalData,
+} from "@/components/clinical";
 import { PageHeader, Btn, Field } from "@/components/qc";
 import { friendlyError } from "@/services/errors";
 import { DEFAULT_CITIES } from "@/domain/cities";
 import type { ManagedClinic } from "@/types/local";
+
 export const Route = createFileRoute("/admin/clinics")({ component: Clinics });
 
 export function Clinics() {
   const { profile } = useAuth(),
     { select } = useClinicContext();
-  const [clinics, setClinics] = useState<ManagedClinic[]>([]),
-    [editing, setEditing] = useState<ManagedClinic | null | undefined>(undefined),
+  const remote = useClinicalData<ManagedClinic[]>("/admin/clinics");
+  const clinics = remote.data ?? [];
+  const [editing, setEditing] = useState<ManagedClinic | null | undefined>(undefined),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false),
     [fixedCity, setFixedCity] = useState(false),
     [city, setCity] = useState(""),
     [created, setCreated] = useState<ManagedClinic | null>(null);
-  const load = async () => {
-    try {
-      setClinics(await api<ManagedClinic[]>("/admin/clinics"));
-      setError("");
-    } catch (e) {
-      setError(friendlyError(e));
-    }
+
+  const reloadClinics = () => {
+    invalidateClinicalCache("/admin/");
+    remote.reload();
   };
-  useEffect(() => {
-    void load();
-  }, []);
+
   const save = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const data = new FormData(e.currentTarget);
@@ -63,7 +65,7 @@ export function Clinics() {
       });
       if (!editing) setCreated(result);
       setEditing(undefined);
-      await load();
+      reloadClinics();
       window.dispatchEvent(new Event("queuecare:refresh"));
     } catch (e) {
       setError(friendlyError(e));
@@ -75,14 +77,14 @@ export function Clinics() {
     ...new Map(
       [...DEFAULT_CITIES, ...clinics.map((c) => c.city || "")]
         .filter(Boolean)
-        .map((name) => [normalizeLocation(name), name])
+        .map((name) => [normalizeLocation(name), name]),
     ).values(),
   ].sort((a, b) => a.localeCompare(b));
   return (
     <>
       <PageHeader
         title="Clinics"
-        sub="Manage your clinic locations. Patient profiles stay shared across clinics."
+        sub="Manage your clinic locations. Appointment availability follows each clinic's opening and closing times automatically."
         right={
           editing === undefined && (
             <Btn
@@ -102,13 +104,13 @@ export function Clinics() {
         <div className="surface mb-6 p-5">
           <p className="font-medium">Clinic created.</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Next: set when you are available at this clinic.
+            Appointment slots automatically follow {created.name}'s opening and closing hours ({created.openingTime} – {created.closingTime}).
           </p>
           <a
-            className="mt-4 inline-block text-primary"
-            href={"/admin/doctor-schedule?clinicId=" + created.id}
+            className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
+            href="/admin/appointments"
           >
-            Set doctor schedule →
+            View appointments →
           </a>
         </div>
       )}
@@ -190,7 +192,7 @@ export function Clinics() {
             </label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Deactivating stops new tokens and queue openings. Existing records remain available.
+            Appointment booking slots and doctor hours automatically follow the clinic's opening and closing times. Deactivating stops new tokens and queue openings while preserving existing records.
           </p>
           <div className="flex gap-3">
             <Btn disabled={busy}>{busy ? "Saving…" : "Save clinic"}</Btn>
@@ -205,105 +207,109 @@ export function Clinics() {
           </div>
         </form>
       )}
-      <div className="surface divide-y divide-border">
-        {!clinics.length && (
-          <p className="p-6 text-sm text-muted-foreground">
-            Add your first clinic to start scheduling patients.
-          </p>
-        )}
-        {groupClinicLocations(clinics).map((g) => (
-          <section key={normalizeLocation(g.city)} className="p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-lg font-semibold">{g.city}</h2>
-            </div>
-            {g.areas.map((a) => (
-              <section key={normalizeLocation(a.area)} className="rounded-lg border border-border">
-                {a.area !== "Area not yet specified" && (
-                  <h3 className="px-5 pt-4 font-medium">{a.area}</h3>
-                )}
-                {a.clinics.map((c) => (
-                  <article key={c.id} className="p-5">
-                    <div className="flex justify-between gap-3">
-                      <h2 className="font-semibold">{c.name}</h2>
-                      <span
-                        className={
-                          c.active ? "text-xs text-success" : "text-xs text-muted-foreground"
-                        }
-                      >
-                        {c.active ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-                    
-                    <p className="mt-2 text-sm text-muted-foreground">{c.address}</p>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      {c.department} · {c.phone}
-                    </p>
-                    <p className="mt-3 text-sm">
-                      {c.openingTime} – {c.closingTime}
-                    </p>
-                    <div className="mt-5 flex flex-wrap gap-2">
-                      <Btn
-                        variant="secondary"
-                        onClick={() => {
-                          setFixedCity(false);
-                          setEditing(c);
-                          setCity(c.city || "");
-                          setCreated(null);
-                        }}
-                      >
-                        Edit clinic
-                      </Btn>
-                      <ConfirmAction
-                        title="Delete or archive clinic?"
-                        description="An empty clinic can be deleted. A clinic with records or schedules must be archived to preserve its history."
-                        confirm="Delete empty clinic"
-                        onConfirm={() =>
-                          void api("/admin/clinics/" + c.id, { method: "DELETE" })
-                            .then(() => {
-                              void load();
-                              window.dispatchEvent(new Event("queuecare:refresh"));
-                            })
-                            .catch((e) => setError(friendlyError(e)))
-                        }
-                      >
-                        <Btn variant="ghost">Delete clinic</Btn>
-                      </ConfirmAction>
-                      {c.active && (
+      {!remote.data ? (
+        <ClinicalLoading error={remote.error} retry={remote.reload} />
+      ) : (
+        <div className="surface divide-y divide-border">
+          {!clinics.length && (
+            <p className="p-6 text-sm text-muted-foreground">
+              Add your first clinic to start scheduling patients.
+            </p>
+          )}
+          {groupClinicLocations(clinics).map((g) => (
+            <section key={normalizeLocation(g.city)} className="space-y-4 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-lg font-semibold">{g.city}</h2>
+              </div>
+              {g.areas.map((a) => (
+                <section key={normalizeLocation(a.area)} className="rounded-lg border border-border">
+                  {a.area !== "Area not yet specified" && (
+                    <h3 className="px-5 pt-4 font-medium">{a.area}</h3>
+                  )}
+                  {a.clinics.map((c) => (
+                    <article key={c.id} className="p-5">
+                      <div className="flex justify-between gap-3">
+                        <h2 className="font-semibold">{c.name}</h2>
+                        <span
+                          className={
+                            c.active ? "text-xs text-success" : "text-xs text-muted-foreground"
+                          }
+                        >
+                          {c.active ? "Active" : "Inactive"}
+                        </span>
+                      </div>
+
+                      <p className="mt-2 text-sm text-muted-foreground">{c.address}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        {c.department} · {c.phone}
+                      </p>
+                      <p className="mt-3 text-sm tabular-nums">
+                        {c.openingTime} – {c.closingTime}
+                      </p>
+                      <div className="mt-5 flex flex-wrap gap-2">
+                        <Btn
+                          variant="secondary"
+                          onClick={() => {
+                            setFixedCity(false);
+                            setEditing(c);
+                            setCity(c.city || "");
+                            setCreated(null);
+                          }}
+                        >
+                          Edit clinic
+                        </Btn>
                         <ConfirmAction
-                          title="Archive this clinic?"
-                          description="Existing records will be preserved. This clinic will no longer accept bookings or queue actions."
-                          confirm="Archive clinic"
+                          title="Delete or archive clinic?"
+                          description="An empty clinic can be deleted. A clinic with patient or appointment records must be archived to preserve its history."
+                          confirm="Delete empty clinic"
                           onConfirm={() =>
-                            void api("/admin/clinics/" + c.id + "?archive=1", { method: "DELETE" })
+                            void api("/admin/clinics/" + c.id, { method: "DELETE" })
                               .then(() => {
-                                void load();
+                                reloadClinics();
                                 window.dispatchEvent(new Event("queuecare:refresh"));
                               })
                               .catch((e) => setError(friendlyError(e)))
                           }
                         >
-                          <Btn variant="ghost">Archive clinic</Btn>
+                          <Btn variant="ghost">Delete clinic</Btn>
                         </ConfirmAction>
-                      )}
-                      <Btn variant="ghost" onClick={() => select(c.id)}>
-                        Select clinic
-                      </Btn>
-                      <a
-                        className="inline-flex items-center px-3 text-sm text-primary hover:underline"
-                        target="_blank"
-                        rel="noreferrer"
-                        href={`/public-display?clinicId=${encodeURIComponent(c.id)}`}
-                      >
-                        Public display
-                      </a>
-                    </div>
-                  </article>
-                ))}
-              </section>
-            ))}
-          </section>
-        ))}
-      </div>
+                        {c.active && (
+                          <ConfirmAction
+                            title="Archive this clinic?"
+                            description="Existing records will be preserved. This clinic will no longer accept bookings or queue actions."
+                            confirm="Archive clinic"
+                            onConfirm={() =>
+                              void api("/admin/clinics/" + c.id + "?archive=1", { method: "DELETE" })
+                                .then(() => {
+                                  reloadClinics();
+                                  window.dispatchEvent(new Event("queuecare:refresh"));
+                                })
+                                .catch((e) => setError(friendlyError(e)))
+                            }
+                          >
+                            <Btn variant="ghost">Archive clinic</Btn>
+                          </ConfirmAction>
+                        )}
+                        <Btn variant="ghost" onClick={() => select(c.id)}>
+                          Select clinic
+                        </Btn>
+                        <a
+                          className="inline-flex items-center px-3 text-sm text-primary hover:underline"
+                          target="_blank"
+                          rel="noreferrer"
+                          href={`/public-display?clinicId=${encodeURIComponent(c.id)}`}
+                        >
+                          Public display
+                        </a>
+                      </div>
+                    </article>
+                  ))}
+                </section>
+              ))}
+            </section>
+          ))}
+        </div>
+      )}
     </>
   );
 }

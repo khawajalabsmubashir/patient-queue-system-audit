@@ -60,18 +60,19 @@ it("Home guides clinic setup without analytics clutter", async () => {
   );
   expect(screen.queryByText("Revenue received")).toBeNull();
 });
-it("Home guides schedule setup before patient booking", async () => {
+it("Home proceeds straight to Today queue when clinics exist without Doctor Schedule setup", async () => {
   f.api.mockResolvedValue({
     ...base,
-    setup: "schedule",
+    setup: "ready",
     clinics: f.clinics,
-    unscheduled: f.clinics,
+    unscheduled: [],
   });
   render(<Today />);
-  expect(await screen.findByRole("button", { name: "Set doctor schedule" })).toBeVisible();
-  expect(screen.getByRole("button", { name: "Set doctor schedule" }).closest("a")).toHaveAttribute(
+  expect(await screen.findByText("Next up")).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Set doctor schedule" })).toBeNull();
+  expect(screen.getByRole("link", { name: /View analytics and exports/i })).toHaveAttribute(
     "href",
-    "/admin/doctor-schedule?clinicId=clinic",
+    "/admin/analytics",
   );
 });
 it("configured Home shows Next up and obvious check-in action", async () => {

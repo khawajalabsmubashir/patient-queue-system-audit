@@ -66,7 +66,7 @@ test(
       assert.equal(admin.status, 200);
       assert.equal(
         (await req("/admin/today?clinicId=northstar", admin.cookie)).data.setup,
-        "schedule",
+        "ready",
       );
       const body = {
         name: "Health Point Clinic",

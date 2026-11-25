@@ -15,31 +15,30 @@ const patientScope =
 const patientOnly =
   "u.role='patient' AND NOT EXISTS(SELECT 1 FROM staff_profiles s WHERE s.user_id=u.id)";
 export async function appointmentFlow(db: Database, clinic: string, date?: string) {
-  const list = await withAppointmentAttention(
+  const day = clinicDayKey();
+  const [rawAppointments, visits, tokens] = await Promise.all([
+    appointments(db, clinic === "all" ? undefined : clinic, date),
+    many<{ id: string; appointment_id: string; status: string }>(
       db,
-      await appointments(db, clinic === "all" ? undefined : clinic, date),
-      (a) => a.id,
+      "SELECT id,appointment_id,status FROM encounters WHERE appointment_id IS NOT NULL AND (?='all' OR clinic_id=?)",
+      clinic,
+      clinic,
     ),
-    day = clinicDayKey();
-  const visits = await many<{ id: string; appointment_id: string; status: string }>(
-    db,
-    "SELECT id,appointment_id,status FROM encounters WHERE appointment_id IS NOT NULL AND (?='all' OR clinic_id=?)",
-    clinic,
-    clinic,
-  );
-  const tokens = await many<{
-    id: string;
-    appointment_id: string;
-    patient_id: string;
-    clinic_id: string;
-    status: string;
-  }>(
-    db,
-    "SELECT t.id,t.appointment_id,t.patient_id,q.clinic_id,t.status FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE q.queue_date=? AND (?='all' OR q.clinic_id=?) AND t.status IN ('waiting','serving','skipped')",
-    day,
-    clinic,
-    clinic,
-  );
+    many<{
+      id: string;
+      appointment_id: string;
+      patient_id: string;
+      clinic_id: string;
+      status: string;
+    }>(
+      db,
+      "SELECT t.id,t.appointment_id,t.patient_id,q.clinic_id,t.status FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE q.queue_date=? AND (?='all' OR q.clinic_id=?) AND t.status IN ('waiting','serving','skipped')",
+      day,
+      clinic,
+      clinic,
+    ),
+  ]);
+  const list = await withAppointmentAttention(db, rawAppointments, (a) => a.id);
   return list.map((a) => {
     const visit = visits.find((v) => v.appointment_id === a.id),
       token = a.scheduledAt.startsWith(day)
@@ -82,8 +81,56 @@ export function workflowRoutes(db: Database, notify: Notify) {
   r.get("/admin/today", admin, async (req, res) => {
     const clinic = scope(req.query["clinicId"]),
       day = clinicDayKey(),
-      clinics = await listClinics(db, true),
-      active = clinics.filter((c) => c.active && (clinic === "all" || c.id === clinic));
+      start = new Date(day + "T00:00:00+05:00").toISOString(),
+      end = new Date(Date.parse(start) + 86400000).toISOString();
+    const [clinics, a, queue, inProgress, completed, queueOnly] = await Promise.all([
+      listClinics(db, true),
+      appointmentFlow(db, clinic, day),
+      many<{
+        id: string;
+        patient_id: string;
+        patient_name: string;
+        clinic_id: string;
+        clinic_name: string;
+        token_code: string;
+        status: string;
+        reason_for_visit: string;
+      }>(
+        db,
+        "SELECT t.id,t.patient_id,u.full_name patient_name,q.clinic_id,c.name clinic_name,t.token_code,t.status,t.reason_for_visit FROM tokens t JOIN daily_queues q ON q.id=t.queue_id JOIN users u ON u.id=t.patient_id JOIN clinics c ON c.id=q.clinic_id JOIN appointments ap ON ap.id=t.appointment_id WHERE q.queue_date=? AND c.active=1 AND ap.status<>'cancelled' AND (?='all' OR q.clinic_id=?) ORDER BY ap.scheduled_at,t.id",
+        day,
+        clinic,
+        clinic,
+      ),
+      many<{
+        id: string;
+        patient_id: string;
+        patient_name: string;
+        clinic_id: string;
+        clinic_name: string;
+      }>(
+        db,
+        "SELECT e.id,e.patient_id,u.full_name patient_name,e.clinic_id,c.name clinic_name FROM encounters e JOIN users u ON u.id=e.patient_id JOIN clinics c ON c.id=e.clinic_id WHERE e.status='in_progress' AND (?='all' OR e.clinic_id=?) ORDER BY e.visit_at",
+        clinic,
+        clinic,
+      ),
+      one<{ n: number }>(
+        db,
+        "SELECT CAST(COUNT(*) AS INTEGER) n FROM encounters WHERE status='completed' AND completed_at>=? AND completed_at<? AND (?='all' OR clinic_id=?)",
+        start,
+        end,
+        clinic,
+        clinic,
+      ),
+      one<{ n: number }>(
+        db,
+        "SELECT CAST(COUNT(*) AS INTEGER) n FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE q.queue_date=? AND t.status='completed' AND (?='all' OR q.clinic_id=?) AND NOT EXISTS(SELECT 1 FROM encounters e WHERE e.token_id=t.id)",
+        day,
+        clinic,
+        clinic,
+      ),
+    ]);
+    const active = clinics.filter((c) => c.active && (clinic === "all" || c.id === clinic));
     if (!active.length) {
       res.json({
         success: true,
@@ -99,68 +146,14 @@ export function workflowRoutes(db: Database, notify: Notify) {
       });
       return;
     }
-    const schedules = await many<{ clinic_id: string }>(
-      db,
-      "SELECT DISTINCT clinic_id FROM doctor_availability",
-    );
-    const a = await appointmentFlow(db, clinic, day);
-    const queue = await many<{
-      id: string;
-      patient_id: string;
-      patient_name: string;
-      clinic_id: string;
-      clinic_name: string;
-      token_code: string;
-      status: string;
-      reason_for_visit: string;
-    }>(
-      db,
-      "SELECT t.id,t.patient_id,u.full_name patient_name,q.clinic_id,c.name clinic_name,t.token_code,t.status,t.reason_for_visit FROM tokens t JOIN daily_queues q ON q.id=t.queue_id JOIN users u ON u.id=t.patient_id JOIN clinics c ON c.id=q.clinic_id JOIN appointments ap ON ap.id=t.appointment_id WHERE q.queue_date=? AND c.active=1 AND ap.status<>'cancelled' AND (?='all' OR q.clinic_id=?) ORDER BY ap.scheduled_at,t.id",
-      day,
-      clinic,
-      clinic,
-    );
-    const inProgress = await many<{
-      id: string;
-      patient_id: string;
-      patient_name: string;
-      clinic_id: string;
-      clinic_name: string;
-    }>(
-      db,
-      "SELECT e.id,e.patient_id,u.full_name patient_name,e.clinic_id,c.name clinic_name FROM encounters e JOIN users u ON u.id=e.patient_id JOIN clinics c ON c.id=e.clinic_id WHERE e.status='in_progress' AND (?='all' OR e.clinic_id=?) ORDER BY e.visit_at",
-      clinic,
-      clinic,
-    );
-    const start = new Date(day + "T00:00:00+05:00").toISOString(),
-      end = new Date(Date.parse(start) + 86400000).toISOString();
-    const completed = await one<{ n: number }>(
-      db,
-      "SELECT CAST(COUNT(*) AS INTEGER) n FROM encounters WHERE status='completed' AND completed_at>=? AND completed_at<? AND (?='all' OR clinic_id=?)",
-      start,
-      end,
-      clinic,
-      clinic,
-    );
-    const queueOnly = await one<{ n: number }>(
-      db,
-      "SELECT CAST(COUNT(*) AS INTEGER) n FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE q.queue_date=? AND t.status='completed' AND (?='all' OR q.clinic_id=?) AND NOT EXISTS(SELECT 1 FROM encounters e WHERE e.token_id=t.id)",
-      day,
-      clinic,
-      clinic,
-    );
     res.json({
       success: true,
       data: {
         completedToday: (completed?.n ?? 0) + (queueOnly?.n ?? 0),
         date: day,
         clinics: active,
-        setup: !active.length
-          ? "clinic"
-          : active.every((c) => !schedules.some((s) => s.clinic_id === c.id))
-            ? "schedule"
-            : "ready",
-        unscheduled: active.filter((c) => !schedules.some((s) => s.clinic_id === c.id)),
+        setup: "ready",
+        unscheduled: [],
         appointments: a.sort((x, y) => x.scheduledAt.localeCompare(y.scheduledAt)),
         queue,
         inProgress,

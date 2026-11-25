@@ -1,21 +1,29 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { AppointmentSlotPicker } from "@/components/appointment-slot-picker";
-import { DoctorSchedule } from "@/routes/admin.doctor-schedule";
+import { Clinics } from "@/routes/admin.clinics";
+import { clearClinicalCache } from "@/components/clinical";
 import { selectOption } from "./select-option";
+
 const fixture = vi.hoisted(() => ({ api: vi.fn(), selected: "northstar" }));
 vi.mock("@/api/client", () => ({ api: fixture.api }));
+vi.mock("@/providers/auth-provider", () => ({
+  useAuth: () => ({ profile: { role: "admin", fullName: "Doctor" } }),
+}));
 vi.mock("@/providers/clinic-provider", () => ({
   useClinicContext: () => ({
     selected: fixture.selected,
+    select: vi.fn(),
     clinics: [{ id: "northstar", name: "Northstar" }],
   }),
 }));
 beforeEach(() => {
+  clearClinicalCache();
   fixture.api.mockReset();
   fixture.selected = "northstar";
 });
 afterEach(cleanup);
+
 it("slot picker uses only backend times and preserves normalized submission values", async () => {
   fixture.api.mockResolvedValue({
     slots: [
@@ -39,6 +47,7 @@ it("slot picker uses only backend times and preserves normalized submission valu
   );
   expect(screen.queryByText("1:00 PM")).toBeNull();
 });
+
 it("slot picker clears selection when date changes and shows no availability", async () => {
   fixture.api
     .mockResolvedValueOnce({ slots: [{ value: "2030-01-07T10:30", label: "10:30 AM" }] })
@@ -61,31 +70,42 @@ it("slot picker clears selection when date changes and shows no availability", a
     "2030-01-07T10:30",
   );
 });
-it("doctor schedule supports split shifts, day off and saves existing duration setting", async () => {
-  fixture.api.mockResolvedValue({
-    windows: [{ weekday: 1, startTime: "10:00", endTime: "12:00" }],
-    slotMinutes: 30,
-    openingTime: "09:00",
-    closingTime: "17:00",
+
+it("clinics creation informs admin that booking follows clinic opening and closing hours automatically", async () => {
+  fixture.api.mockImplementation((path: string, opts?: { method?: string }) => {
+    if (opts?.method === "POST") {
+      return Promise.resolve({
+        id: "new-clinic",
+        name: "Care Clinic",
+        openingTime: "09:00",
+        closingTime: "18:00",
+        city: "Karachi",
+        address: "Clifton",
+        phone: "03001112233",
+        department: "General",
+        doctorName: "Doctor",
+        active: true,
+        publicDisplayName: "Care Clinic",
+        publicDisplayShowNext: true,
+        averageConsultationMinutes: 5,
+        tokenPrefix: "CC",
+        consultationFee: null,
+      });
+    }
+    return Promise.resolve([]);
   });
-  render(<DoctorSchedule />);
-  await screen.findByLabelText("Monday start 1");
-  fireEvent.click(screen.getByRole("button", { name: "+ Add another time" }));
-  await screen.findByLabelText("Monday start 2");
-  fireEvent.change(screen.getByLabelText("Monday start 2"), { target: { value: "14:00" } });
-  fireEvent.click(screen.getByRole("button", { name: "Save schedule" }));
-  await waitFor(() =>
-    expect(fixture.api).toHaveBeenCalledWith("/admin/doctor-availability?clinicId=northstar", {
-      method: "PUT",
-      body: {
-        slotMinutes: 30,
-        windows: [
-          { weekday: 1, startTime: "10:00", endTime: "12:00" },
-          { weekday: 1, startTime: "14:00", endTime: "17:00" },
-        ],
-      },
-    }),
+  render(<Clinics />);
+  fireEvent.click(await screen.findByRole("button", { name: "Add clinic" }));
+  fireEvent.click(screen.getByRole("button", { name: "City" }));
+  fireEvent.click(await screen.findByRole("option", { name: "Karachi" }));
+  fireEvent.change(screen.getByLabelText("Clinic name *"), { target: { value: "Care Clinic" } });
+  fireEvent.change(screen.getByLabelText("Address *"), { target: { value: "Clifton" } });
+  fireEvent.change(screen.getByLabelText("Phone *"), { target: { value: "03001112233" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save clinic" }));
+  expect(await screen.findByText(/Appointment slots automatically follow Care Clinic/i)).toBeVisible();
+  expect(screen.queryByRole("link", { name: /Set doctor schedule/i })).toBeNull();
+  expect(screen.getByRole("link", { name: /View appointments/i })).toHaveAttribute(
+    "href",
+    "/admin/appointments",
   );
-  fireEvent.click(screen.getByRole("button", { name: "Mark day off" }));
-  expect(screen.queryByLabelText("Monday start 1")).toBeNull();
 });

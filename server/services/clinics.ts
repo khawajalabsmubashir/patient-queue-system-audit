@@ -11,11 +11,65 @@ import { clinicValue, publicQueue } from "./queueService.ts";
 import type { ManagedClinic, AllClinicsState, Appointment } from "../../src/types/local.ts";
 
 export async function listClinics(db: Database, includeInactive = false): Promise<ManagedClinic[]> {
-  const rows = await many<{ id: string }>(
-    db,
-    `SELECT id FROM clinics ${includeInactive ? "" : "WHERE active=1"} ORDER BY created_at,id`,
-  );
-  return Promise.all(rows.map(async (c) => (await clinicValue(db, c.id)) as ManagedClinic));
+  const [rows, durations] = await Promise.all([
+    many<{
+      id: string;
+      city: string | null;
+      area: string | null;
+      active: number;
+      consultation_fee: number | null;
+      name: string;
+      display_name: string;
+      address: string;
+      phone: string;
+      department: string;
+      doctor_name: string;
+      opening_time: string;
+      closing_time: string;
+      token_prefix: string;
+      public_display_show_next: number;
+    }>(
+      db,
+      `SELECT * FROM clinics ${includeInactive ? "" : "WHERE active=1"} ORDER BY created_at,id`,
+    ),
+    many<{ clinic_id: string; called_at: string; completed_at: string }>(
+      db,
+      "SELECT clinic_id,called_at,completed_at FROM (SELECT q.clinic_id,t.called_at,t.completed_at,ROW_NUMBER() OVER(PARTITION BY q.clinic_id ORDER BY t.completed_at DESC) rn FROM tokens t JOIN daily_queues q ON q.id=t.queue_id WHERE t.status='completed' AND t.called_at IS NOT NULL AND t.completed_at IS NOT NULL AND t.skipped_at IS NULL) ranked WHERE rn<=30",
+    ),
+  ]);
+  const byClinic = new Map<string, number[]>();
+  for (const r of durations) {
+    const m = (Date.parse(r.completed_at) - Date.parse(r.called_at)) / 60000;
+    if (!Number.isFinite(m) || m < 0.5 || m > 120) continue;
+    const list = byClinic.get(r.clinic_id) ?? [];
+    list.push(m);
+    byClinic.set(r.clinic_id, list);
+  }
+  const estimateFor = (clinicId: string) => {
+    const minutes = (byClinic.get(clinicId) ?? []).sort((a, b) => a - b);
+    if (minutes.length < 5) return 5;
+    const mid = Math.floor(minutes.length / 2);
+    const median = minutes.length % 2 ? minutes[mid]! : (minutes[mid - 1]! + minutes[mid]!) / 2;
+    return Math.min(30, Math.max(2, Math.round(median)));
+  };
+  return rows.map((c) => ({
+    id: c.id,
+    city: c.city,
+    area: c.area,
+    active: Boolean(c.active),
+    consultationFee: c.consultation_fee,
+    name: c.name,
+    publicDisplayName: c.display_name,
+    address: c.address,
+    phone: c.phone,
+    department: c.department,
+    doctorName: c.doctor_name,
+    openingTime: c.opening_time,
+    closingTime: c.closing_time,
+    averageConsultationMinutes: estimateFor(c.id),
+    tokenPrefix: c.token_prefix,
+    publicDisplayShowNext: Boolean(c.public_display_show_next),
+  }));
 }
 const clinicSchema = z
   .object({
@@ -109,6 +163,22 @@ export async function saveClinic(
         c.area === undefined ? (existing?.area ?? null) : c.area || null,
         clinicId,
       );
+    const doctor = await one<{ id: string }>(
+      db,
+      "SELECT id FROM users WHERE role='admin' ORDER BY created_at,id LIMIT 1",
+    );
+    if (doctor) {
+      await db
+        .prepare("DELETE FROM doctor_availability WHERE doctor_user_id=? AND clinic_id=?")
+        .run(doctor.id, clinicId);
+      for (let weekday = 0; weekday < 7; weekday++) {
+        await db
+          .prepare(
+            "INSERT INTO doctor_availability (id,doctor_user_id,clinic_id,weekday,start_time,end_time,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?)",
+          )
+          .run(randomUUID(), doctor.id, clinicId, weekday, c.opening, c.closing, stamp, stamp);
+      }
+    }
     return (await clinicValue(db, clinicId)) as ManagedClinic;
   });
 }
@@ -301,7 +371,6 @@ export async function clinicRemoval(
       "visits",
       "patient_documents",
       "invoices",
-      "doctor_availability",
       "clinic_branding",
       "staff_clinics",
       "medicine_catalog",
@@ -332,6 +401,7 @@ export async function clinicRemoval(
     // Audit entries retain the clinic identity even after an empty clinic is removed.
 
     await audit(db, actor, "clinic.deleted", "clinic", clinicId, null);
+    await db.prepare("DELETE FROM doctor_availability WHERE clinic_id=?").run(clinicId);
     await db.prepare("DELETE FROM clinics WHERE id=?").run(clinicId);
     return { deleted: true };
   });

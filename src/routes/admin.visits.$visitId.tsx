@@ -32,18 +32,6 @@ function Consultation() {
           sub={`${v.patientName} · ${v.clinicName}`}
           right={
             <div className="flex flex-wrap gap-2">
-              <a
-                href={
-                  "/admin/billing?clinicId=" +
-                  encodeURIComponent(v.clinicId) +
-                  "&patientId=" +
-                  encodeURIComponent(v.patientId) +
-                  "&visitId=" +
-                  encodeURIComponent(v.id)
-                }
-              >
-                <Btn variant="secondary">Create Invoice</Btn>
-              </a>
               <Link to="/admin/patient-record/$patientId" params={{ patientId: v.patientId }}>
                 <Btn variant="secondary">Patient record</Btn>
               </Link>

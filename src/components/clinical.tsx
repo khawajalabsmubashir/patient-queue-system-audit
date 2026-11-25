@@ -9,10 +9,17 @@ import { formatDateOnly } from "@/domain/date-format";
 import { friendlyError } from "@/services/errors";
 import type { ClinicalVisit, PatientVisit } from "@/types/clinical";
 type CacheEntry = { data: unknown; fetchedAt: number; stale: boolean };
-const CLINICAL_STALE_MS = 10_000;
+const CLINICAL_STALE_MS = 30_000;
 const clinicalCache = new Map<string, CacheEntry>();
 const inFlightRequests = new Map<string, Promise<unknown>>();
 let listenersRegistered = false;
+
+export function seedClinicalCache<T>(path: string, data: T) {
+  ensureCacheListeners();
+  const existing = clinicalCache.get(path);
+  if (existing && !existing.stale && Date.now() - existing.fetchedAt < CLINICAL_STALE_MS) return;
+  clinicalCache.set(path, { data, fetchedAt: Date.now(), stale: false });
+}
 
 export function clearClinicalCache() {
   clinicalCache.clear();

@@ -14,7 +14,6 @@ import {
   LogOut,
   Menu,
   Pill,
-  Receipt,
   ShieldCheck,
   Ticket,
   User,
@@ -70,7 +69,6 @@ const recordLinks = [
     icon: Pill,
     prefetch: "/patient/prescriptions",
   },
-  { to: "/patient/billing", label: "Billing", icon: Receipt, prefetch: "/billing/invoices?clinicId=all" },
   { to: "/patient/history", label: "Visit history", icon: History, prefetch: "" },
 ] as const;
 
@@ -226,11 +224,6 @@ function PatientFooter() {
                 <li>
                   <Link to="/patient/prescriptions" className="hover:text-white hover:underline">
                     Prescriptions
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/patient/billing" className="hover:text-white hover:underline">
-                    Billing
                   </Link>
                 </li>
                 <li>
@@ -394,7 +387,7 @@ function PatientLayout() {
 function PatientLayoutContent() {
   const { pathname } = useLocation();
   const { profile } = useAuth();
-  const { selected } = useClinicContext();
+  useClinicContext();
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const normalizedPath = pathname.replace(/\/$/, "") || "/patient/dashboard";
@@ -402,10 +395,6 @@ function PatientLayoutContent() {
   const recordsActive = recordLinks.some((r) => normalizedPath.startsWith(r.to));
 
   const prefetchNav = (to: string, prefetchPath: string) => {
-    if (to === "/patient/billing") {
-      prefetchClinicalData(`/billing/invoices?clinicId=${encodeURIComponent(selected || "all")}`);
-      return;
-    }
     if (to === "/patient/appointments") {
       prefetchClinicalData("/patient/appointments");
       prefetchClinicalData("/patient/profile");

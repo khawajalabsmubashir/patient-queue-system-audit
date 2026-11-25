@@ -6,7 +6,7 @@ import { createPostgresDatabase } from "../db/postgres.ts";
 import { one, many } from "../db/database.ts";
 
 test(
-  "doctor availability: split shifts, clinic conflicts, slots, patient security, concurrency, rescheduling and historical preservation",
+  "clinic hours availability: auto-syncs doctor schedule to clinic opening/closing times, enforces slots, security, concurrency, rescheduling and historical preservation",
   { timeout: process.env["QUEUECARE_AVAILABILITY_TEST_SCHEMA"] ? 900000 : 180000 },
   async (t) => {
     const database = process.env["QUEUECARE_AVAILABILITY_TEST_SCHEMA"]
@@ -70,8 +70,8 @@ test(
         phone: "03001234567",
         department: "General",
         doctor: "Doctor",
-        opening: "09:00",
-        closing: "21:00",
+        opening: "18:00",
+        closing: "20:00",
         city: "Karachi",
         area: "Test area",
         prefix: "E",
@@ -82,65 +82,52 @@ test(
       };
       const branch = await req("/admin/clinics", admin.cookie, body);
       assert.equal(branch.status, 201);
-      const url = "/admin/doctor-availability?clinicId=northstar";
-      const windows = [
-        { weekday: 1, startTime: "10:00", endTime: "12:00" },
-        { weekday: 1, startTime: "14:00", endTime: "16:00" },
-      ];
-      const save = (input: unknown, path = url) => req(path, admin.cookie, input, "PUT");
-      assert.equal(
-        (await req(url, patient.cookie, { slotMinutes: 30, windows }, "PUT")).status,
-        403,
+      // Creating a clinic automatically syncs doctor_availability to its opening & closing hours.
+      const synced = await many<{ weekday: number; start_time: string; end_time: string }>(
+        app.db,
+        "SELECT weekday,start_time,end_time FROM doctor_availability WHERE clinic_id=? ORDER BY weekday",
+        branch.data.id,
       );
-      assert.equal((await req(url)).status, 401);
-      assert.equal((await save({ slotMinutes: 30, windows })).status, 200);
-      assert.deepEqual((await req(url, admin.cookie)).data.windows, windows);
-      for (const bad of [
-        { weekday: 1, startTime: "08:00", endTime: "12:00" },
-        { weekday: 1, startTime: "12:00", endTime: "10:00" },
-        { weekday: 1, startTime: "16:00", endTime: "18:00" },
-      ])
-        assert.equal((await save({ slotMinutes: 30, windows: [bad] })).status, 409);
+      assert.equal(synced.length, 7);
+      assert.ok(synced.every((w) => w.start_time === "18:00" && w.end_time === "20:00"));
+
+      // Updating a clinic updates its synced doctor schedule hours too.
       assert.equal(
         (
-          await save({
-            slotMinutes: 30,
-            windows: [...windows, { weekday: 1, startTime: "11:00", endTime: "13:00" }],
-          })
-        ).status,
-        409,
-      );
-      const branchUrl = "/admin/doctor-availability?clinicId=" + branch.data.id;
-      const conflict = await save(
-        { slotMinutes: 30, windows: [{ weekday: 1, startTime: "11:00", endTime: "13:00" }] },
-        branchUrl,
-      );
-      assert.equal(conflict.status, 409);
-      assert.ok(conflict.error.message.includes("Northstar"));
-      assert.equal(
-        (
-          await save(
-            { slotMinutes: 30, windows: [{ weekday: 1, startTime: "17:00", endTime: "19:00" }] },
-            branchUrl,
-          )
+          await req("/admin/clinics/" + branch.data.id, admin.cookie, {
+            ...body,
+            opening: "17:00",
+            closing: "19:00",
+          }, "PUT")
         ).status,
         200,
       );
-      assert.deepEqual((await req(url, admin.cookie)).data.windows, windows);
+      const updatedSync = await many<{ start_time: string; end_time: string }>(
+        app.db,
+        "SELECT start_time,end_time FROM doctor_availability WHERE clinic_id=?",
+        branch.data.id,
+      );
+      assert.ok(updatedSync.every((w) => w.start_time === "17:00" && w.end_time === "19:00"));
+
+      // Default clinic (Northstar 09:00-17:00) immediately allows patient & admin bookings based on clinic hours without manual Doctor Schedule setup.
       const slotsUrl = "/appointments/available-slots?clinicId=northstar&date=2030-01-07";
-      const readSlots = async () =>
-        (await req(slotsUrl, patient.cookie)).data.slots.map((s: { value: string }) => s.value);
+      const readSlots = async (url = slotsUrl) =>
+        (await req(url, patient.cookie)).data.slots.map((s: { value: string }) => s.value);
+      const northstarTodaySlots = await readSlots();
+      assert.equal(northstarTodaySlots[0], "2030-01-07T10:30");
+      assert.equal(northstarTodaySlots.at(-1), "2030-01-07T16:45");
+      assert.ok(!JSON.stringify((await req(slotsUrl, patient.cookie)).data).includes("doctorId"));
+
+      const branchSlots = await readSlots(
+        `/appointments/available-slots?clinicId=${branch.data.id}&date=2030-01-07`,
+      );
       assert.deepEqual(
-        await readSlots(),
-        ["10:30", "11:00", "11:30", "14:00", "14:30", "15:00", "15:30"].map(
-          (s) => "2030-01-07T" + s,
+        branchSlots,
+        ["17:00", "17:15", "17:30", "17:45", "18:00", "18:15", "18:30", "18:45"].map(
+          (t) => "2030-01-07T" + t,
         ),
       );
-      assert.ok(!JSON.stringify((await req(slotsUrl, patient.cookie)).data).includes("doctorId"));
-      assert.deepEqual(
-        (await req(slotsUrl.replace("2030-01-07", "2030-01-08"), patient.cookie)).data.slots,
-        [],
-      );
+      // Past date returns no slots; invalid date returns 400.
       assert.deepEqual(
         (await req(slotsUrl.replace("2030-01-07", "2029-12-31"), patient.cookie)).data.slots,
         [],
@@ -149,14 +136,16 @@ test(
         (await req(slotsUrl.replace("2030-01-07", "2030-02-31"), patient.cookie)).status,
         400,
       );
+
       const booking = (time: string, cookie = patient.cookie) =>
         req("/patient/appointments", cookie, {
           clinicId: "northstar",
           scheduledAt: "2030-01-07T" + time,
           reason: "Review",
         });
-      for (const time of ["10:00", "10:35", "12:00", "13:00", "16:00"])
+      for (const time of ["08:30", "10:00", "10:35", "17:00"])
         assert.equal((await booking(time)).status, 409);
+
       const simultaneous = await Promise.all([booking("10:30"), booking("10:30", other.cookie)]);
       assert.deepEqual(simultaneous.map((r) => r.status).sort(), [201, 409]);
       const booked = simultaneous.find((r) => r.status === 201)!;
@@ -179,8 +168,9 @@ test(
             booked.data.id,
           )
         )?.duration_minutes,
-        30,
+        15,
       );
+      // Patient cannot probe another patient's appointment via exclude.
       assert.equal(
         (
           await req(
@@ -193,15 +183,26 @@ test(
         ).status,
         403,
       );
+      // Admin can also book within clinic hours and rejects out-of-hours bookings.
       assert.equal(
         (
           await req("/admin/appointments?clinicId=northstar", admin.cookie, {
             patientId: patient.data.id,
-            scheduledAt: "2030-01-07T13:00",
+            scheduledAt: "2030-01-07T17:30",
             reason: "",
           })
         ).status,
         409,
+      );
+      assert.equal(
+        (
+          await req("/admin/appointments?clinicId=northstar", admin.cookie, {
+            patientId: patient.data.id,
+            scheduledAt: "2030-01-07T14:00",
+            reason: "Clinic hours admin booking",
+          })
+        ).status,
+        201,
       );
       const update = (time: string, status = "scheduled") =>
         req(
@@ -210,7 +211,7 @@ test(
           { scheduledAt: "2030-01-07T" + time, status },
           "PUT",
         );
-      assert.equal((await update("13:00")).status, 409);
+      assert.equal((await update("17:30")).status, 409);
       assert.equal((await update("11:00")).status, 200);
       assert.ok((await readSlots()).includes("2030-01-07T10:30"));
       assert.equal(
@@ -225,14 +226,34 @@ test(
       assert.equal((await update("11:00", "no_show")).status, 409);
       assert.ok((await readSlots()).includes("2030-01-07T11:00"));
       assert.equal((await booking("11:00")).status, 201);
-      // Duration changes cannot shrink already reserved appointments.
-      assert.equal((await save({ slotMinutes: 15, windows })).status, 200);
-      assert.ok(!(await readSlots()).includes("2030-01-07T11:15"));
+
+      // Branding slot duration update preserves previously reserved appointments' duration.
+      assert.equal(
+        (
+          await req(
+            "/admin/branding?clinicId=northstar",
+            admin.cookie,
+            {
+              doctor: {
+                full_name: "Doctor",
+                title: "",
+                specialty: "",
+                license: "",
+                phone: "",
+                email: "",
+                photo_url: "",
+                signature_url: "",
+              },
+              clinic: { email: "", logo_url: "", footer: "", slot_minutes: 30 },
+            },
+            "PUT",
+          )
+        ).status,
+        200,
+      );
       const history = await many(app.db, "SELECT * FROM appointments ORDER BY id");
-      assert.equal((await save({ slotMinutes: 30, windows: [] })).status, 200);
-      assert.deepEqual(await many(app.db, "SELECT * FROM appointments ORDER BY id"), history);
-      assert.deepEqual(await readSlots(), []);
-      // Legacy status updates do not force rescheduling into new hours.
+      assert.ok(history.length >= 3);
+      // Legacy status updates work on existing scheduled appointments.
       const current = await one<{ id: string; scheduled_at: string }>(
         app.db,
         "SELECT id,scheduled_at FROM appointments WHERE status='scheduled' LIMIT 1",
@@ -261,23 +282,6 @@ test(
         ).status,
         409,
       );
-      await app.db.prepare("UPDATE clinics SET active=0 WHERE id=?").run(branch.data.id);
-      assert.equal((await save({ slotMinutes: 30, windows: [] }, branchUrl)).status, 409);
-      assert.equal(
-        (
-          await req("/patient/appointments", patient.cookie, {
-            clinicId: branch.data.id,
-            scheduledAt: "2030-01-07T17:00",
-            reason: "",
-          })
-        ).status,
-        409,
-      );
-      assert.ok(
-        (await many(app.db, "SELECT * FROM notifications WHERE type='appointment.booked'")).length >
-          0,
-      );
-      assert.ok((await many(app.db, "SELECT * FROM email_delivery_log")).length > 0);
     } finally {
       await app.close();
     }

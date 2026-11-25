@@ -33,6 +33,7 @@ describe("App routing", () => {
     "/admin/documents",
     "/admin/activity",
     "/admin/follow-ups",
+    "/admin/analytics",
     "/admin/reports",
     "/admin/branding",
     "/admin/account",
