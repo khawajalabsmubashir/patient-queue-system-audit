@@ -4,6 +4,7 @@ import { AppointmentCalendar } from "@/components/appointment-calendar";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
+import { AppLink } from "@/components/app-link";
 import { Btn, Field, Logo, PageHeader } from "@/components/qc";
 import { ProtectedRoute } from "@/components/protected-route";
 import { useAuth } from "@/providers/auth-provider";
@@ -138,9 +139,9 @@ function Workspace() {
         <div className="ml-auto flex max-w-full flex-wrap items-center gap-3">
           <ClinicSwitcher />
           <NotificationCenter />
-          <a className="text-sm text-primary" href="/account">
+          <AppLink className="text-sm text-primary" href="/account">
             Account
-          </a>
+          </AppLink>
           <Btn type="button" variant="ghost" onClick={() => setConfirmLogout(true)}>
             Sign out
           </Btn>
@@ -286,7 +287,9 @@ function Workspace() {
                 <div className="surface divide-y divide-border">
                   {state.appointments.map((a) => (
                     <article key={a.id} className="space-y-3 p-5">
-                      <p className="break-words [overflow-wrap:anywhere] font-medium">{a.patientName}</p>
+                      <p className="break-words [overflow-wrap:anywhere] font-medium">
+                        {a.patientName}
+                      </p>
                       <p className="text-sm">
                         {a.scheduledAt.replace("T", " ")} · {a.status}
                       </p>
@@ -331,11 +334,7 @@ function Workspace() {
             {tab === "preparation" &&
               nurse &&
               (prep ? (
-                <NursePreparation
-                  id={prep}
-                  patientId={prepPatientId ?? ""}
-                  clinicId={selected}
-                />
+                <NursePreparation id={prep} patientId={prepPatientId ?? ""} clinicId={selected} />
               ) : (
                 <p className="surface p-6 text-sm text-muted-foreground">
                   Open a patient from the serving queue or a scheduled appointment to prepare their
@@ -352,7 +351,8 @@ function Workspace() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
             <AlertDialogDescription>
-              Any unsaved work will be lost. You will need to sign in again to access the clinic staff workspace.
+              Any unsaved work will be lost. You will need to sign in again to access the clinic
+              staff workspace.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -444,18 +444,18 @@ function DemographicEditor({
           defaultValue={p.dateOfBirth ?? ""}
         />
         <Field
-  label="Emergency contact name"
-  name="emergencyContactName"
-  defaultValue={p.emergencyContactName ?? ""}
-  maxLength={120}
-/>
-<Field
-  label="Emergency contact phone"
-  name="emergencyContactPhone"
-  type="tel"
-  defaultValue={p.emergencyContactPhone ?? ""}
-  maxLength={30}
-/>
+          label="Emergency contact name"
+          name="emergencyContactName"
+          defaultValue={p.emergencyContactName ?? ""}
+          maxLength={120}
+        />
+        <Field
+          label="Emergency contact phone"
+          name="emergencyContactPhone"
+          type="tel"
+          defaultValue={p.emergencyContactPhone ?? ""}
+          maxLength={30}
+        />
         <label className="text-sm">
           Gender
           <SelectField
@@ -480,7 +480,6 @@ function DemographicEditor({
     </form>
   );
 }
-
 
 function NursePreparation({
   id,
@@ -522,12 +521,7 @@ function NursePreparation({
   }
 
   if (!patientRemote.data) {
-    return (
-      <ClinicalLoading
-        error={patientRemote.error}
-        retry={patientRemote.reload}
-      />
-    );
+    return <ClinicalLoading error={patientRemote.error} retry={patientRemote.reload} />;
   }
 
   const d = remote.data;
@@ -537,10 +531,7 @@ function NursePreparation({
 
     const f = new FormData(e.currentTarget);
     const vitals = Object.fromEntries(
-      fields.map(([key]) => [
-        key,
-        f.get(key) === "" ? null : Number(f.get(key)),
-      ]),
+      fields.map(([key]) => [key, f.get(key) === "" ? null : Number(f.get(key))]),
     ) as unknown as Vitals;
 
     setBusy(true);
@@ -549,15 +540,12 @@ function NursePreparation({
 
     try {
       // Save the patient's blood group.
-      await api(
-        "/staff/patients/" + patientId + "?clinicId=" + encodeURIComponent(clinicId),
-        {
-          method: "PUT",
-          body: {
-            bloodGroup: String(f.get("bloodGroup") ?? ""),
-          },
+      await api("/staff/patients/" + patientId + "?clinicId=" + encodeURIComponent(clinicId), {
+        method: "PUT",
+        body: {
+          bloodGroup: String(f.get("bloodGroup") ?? ""),
         },
-      );
+      });
 
       // Save consultation details and vitals.
       await api("/staff/preparations/" + id, {
@@ -587,10 +575,7 @@ function NursePreparation({
         Optional measurements only. Final clinical decisions remain with the doctor.
       </p>
 
-      <fieldset
-        disabled={d.status !== "in_progress" || busy}
-        className="grid gap-4 sm:grid-cols-2"
-      >
+      <fieldset disabled={d.status !== "in_progress" || busy} className="grid gap-4 sm:grid-cols-2">
         <Field
           label="Reason for visit"
           name="reason"
@@ -612,18 +597,7 @@ function NursePreparation({
             defaultValue={patientRemote.data.bloodGroup ?? ""}
             className="mt-2 block w-full rounded-lg border bg-card p-3"
           >
-            {[
-              "",
-              "A+",
-              "A-",
-              "B+",
-              "B-",
-              "AB+",
-              "AB-",
-              "O+",
-              "O-",
-              "unknown",
-            ].map((v) => (
+            {["", "A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-", "unknown"].map((v) => (
               <option key={v} value={v}>
                 {v || "Select blood group"}
               </option>
@@ -661,4 +635,3 @@ function NursePreparation({
     </form>
   );
 }
-

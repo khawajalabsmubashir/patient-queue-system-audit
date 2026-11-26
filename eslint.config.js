@@ -36,5 +36,13 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    files: ["**/*.test.{ts,tsx}", "server/test/**"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
+      "prefer-const": "off",
+      "@typescript-eslint/no-this-alias": "off",
+    },
+  },
   eslintPluginPrettier,
 );

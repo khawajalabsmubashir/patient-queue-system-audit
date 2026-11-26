@@ -3,6 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { api } from "@/api/client";
 import { appointmentTimeLabel } from "@/lib/appointment-time";
+import { AppLink } from "@/components/app-link";
 import { Btn, Field, PageHeader } from "@/components/qc";
 import { SelectField } from "@/components/form-controls";
 import { ClinicalLoading, useClinicalData } from "@/components/clinical";
@@ -192,8 +193,8 @@ export function DoctorSchedule() {
           )}
           {saved && (
             <div className="flex flex-wrap gap-4 text-sm text-primary">
-              <a href={"/admin/appointments?clinicId=" + selected}>View appointments</a>
-              <a href="/admin">Back to dashboard</a>
+              <AppLink href={"/admin/appointments?clinicId=" + selected}>View appointments</AppLink>
+              <AppLink href="/admin">Back to dashboard</AppLink>
             </div>
           )}
           <Btn disabled={busy}>{busy ? "Saving…" : "Save schedule"}</Btn>

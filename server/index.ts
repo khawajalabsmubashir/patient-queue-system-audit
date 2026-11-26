@@ -4,14 +4,18 @@ const port = Number(process.env["PORT"] ?? 3001);
 if (!Number.isInteger(port) || port < 1 || port > 65535)
   throw new Error("PORT must be a valid local port.");
 const databaseUrl = process.env["DATABASE_URL"];
-if (!databaseUrl)
-  throw new Error(
-    "DATABASE_URL is required. Configure the Supabase PostgreSQL connection in .env.local.",
-  );
-const database = await createPostgresDatabase(databaseUrl);
+let database;
+if (databaseUrl) {
+  try {
+    database = await createPostgresDatabase(databaseUrl);
+    console.log("QueueCare connected to PostgreSQL database.");
+  } catch (err) {
+    console.warn("Could not connect to PostgreSQL database, falling back to local SQLite:", err);
+  }
+}
 const instance = createLocalApp({
-  database,
-  appUrl: process.env["APP_URL"] ?? "http://localhost:5174",
+  ...(database ? { database } : { dbPath: process.env["DB_PATH"] || "data/queuecare.db" }),
+  appUrl: process.env["APP_URL"] ?? "http://localhost:3000",
 });
 instance.http.on("error", (error: NodeJS.ErrnoException) => {
   console.error(
@@ -23,8 +27,10 @@ instance.http.on("error", (error: NodeJS.ErrnoException) => {
   process.exit(1);
 });
 instance.http.listen(port, "127.0.0.1", () => {
-  console.log("QueueCare Supabase PostgreSQL database ready.");
-  console.log(`API server: http://localhost:${port}`);
+  console.log(
+    database ? "QueueCare Supabase PostgreSQL database ready." : "QueueCare SQLite database ready.",
+  );
+  console.log(`API server: http://127.0.0.1:${port}`);
 });
 for (const signal of ["SIGINT", "SIGTERM"] as const)
   process.on(signal, () => {

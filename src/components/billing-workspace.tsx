@@ -313,8 +313,7 @@ export function BillingWorkspace({ portal = false }: { portal?: boolean }) {
               <div>
                 <p className="font-semibold">Invoice {i.invoice_number}</p>
                 <p className="text-sm">
-                  {i.status.replaceAll("_", " ")} ·{" "}
-                  {formatDateOnly(i.issued_at ?? i.created_at)}
+                  {i.status.replaceAll("_", " ")} · {formatDateOnly(i.issued_at ?? i.created_at)}
                 </p>
               </div>
             </div>
@@ -365,8 +364,8 @@ export function BillingWorkspace({ portal = false }: { portal?: boolean }) {
             <h3 className="mt-6 font-semibold">Payment history</h3>
             {i.payments?.map((p) => (
               <p key={p.id} className="mt-2 text-sm">
-                {formatDateTime(p.paid_at)} · {p.method.replaceAll("_", " ")} ·{" "}
-                {money(p.amount)} {p.reference && "· " + p.reference}
+                {formatDateTime(p.paid_at)} · {p.method.replaceAll("_", " ")} · {money(p.amount)}{" "}
+                {p.reference && "· " + p.reference}
               </p>
             ))}
             {!i.payments?.length && (
@@ -419,7 +418,10 @@ export function BillingWorkspace({ portal = false }: { portal?: boolean }) {
               />
               <label className="text-sm font-medium">
                 Method
-                <SelectField name="method" className="mt-2 block w-full rounded-lg border bg-card p-3">
+                <SelectField
+                  name="method"
+                  className="mt-2 block w-full rounded-lg border bg-card p-3"
+                >
                   {["cash", "card", "bank_transfer", "other"].map((m) => (
                     <option key={m} value={m}>
                       {m.replaceAll("_", " ")}

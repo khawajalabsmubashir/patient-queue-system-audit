@@ -8,12 +8,12 @@ import { tokenValue } from "../services/queueService.ts";
 export function tokenDocumentRoutes(db: Database) {
   const r = Router();
   const data = async (id: string, user: { id: string; role: string }) => {
-    const t = await one<any>(
+    const t = await one<Record<string, unknown>>(
       db,
       "SELECT t.*,q.queue_date,q.clinic_id,c.name clinic_name,c.city,c.area,c.address,c.phone clinic_phone,a.scheduled_at,u.full_name,u.phone FROM tokens t JOIN appointments a ON a.id=t.appointment_id JOIN daily_queues q ON q.id=t.queue_id JOIN clinics c ON c.id=q.clinic_id JOIN users u ON u.id=t.patient_id WHERE t.id=?",
       id,
     );
-    if (!t || (user.role !== "admin" && (user.role !== "patient" || user.id !== t.patient_id)))
+    if (!t || (user.role !== "admin" && (user.role !== "patient" || user.id !== t["patient_id"])))
       throw new ApiError(404, "NOT_FOUND", "Token not found.");
     return t;
   };
@@ -121,12 +121,21 @@ export function tokenDocumentRoutes(db: Database) {
       visit.prescription.items.forEach((item, index) => {
         const title = [item.medicine, item.strength, item.dosageForm].filter(Boolean).join(" ");
         const schedule = [item.dose, item.frequency, item.duration].filter(Boolean).join(" · ");
-        pdf.moveDown(0.4).fillColor("#152b29").fontSize(10.5).text(`${index + 1}. ${title}`);
+        pdf
+          .moveDown(0.4)
+          .fillColor("#152b29")
+          .fontSize(10.5)
+          .text(`${index + 1}. ${title}`);
         if (schedule) pdf.fillColor("#475569").fontSize(9.5).text(`   ${schedule}`);
-        if (item.instructions) pdf.fillColor("#475569").fontSize(9.5).text(`   Note: ${item.instructions}`);
+        if (item.instructions)
+          pdf.fillColor("#475569").fontSize(9.5).text(`   Note: ${item.instructions}`);
       });
     } else {
-      pdf.moveDown(0.4).fillColor("#475569").fontSize(10).text("No medications recorded for this visit.");
+      pdf
+        .moveDown(0.4)
+        .fillColor("#475569")
+        .fontSize(10)
+        .text("No medications recorded for this visit.");
     }
     if (visit.prescription.instructions) {
       pdf.moveDown().fillColor("#0F766E").fontSize(11).text("Prescription Advice");
@@ -138,7 +147,11 @@ export function tokenDocumentRoutes(db: Database) {
     }
     if (visit.followUpDate || visit.followUpInstructions) {
       pdf.moveDown().fillColor("#0F766E").fontSize(11).text("Follow-up Guidance");
-      if (visit.followUpDate) pdf.fillColor("#152b29").fontSize(10).text("Follow-up date: " + visit.followUpDate);
+      if (visit.followUpDate)
+        pdf
+          .fillColor("#152b29")
+          .fontSize(10)
+          .text("Follow-up date: " + visit.followUpDate);
       if (visit.followUpInstructions)
         pdf.fillColor("#152b29").fontSize(10).text(visit.followUpInstructions);
     }

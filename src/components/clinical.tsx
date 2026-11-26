@@ -70,10 +70,7 @@ export function prefetchClinicalData(path: string | null) {
   void fetchClinical(path).catch(() => {});
 }
 
-export function useClinicalData<T>(
-  path: string | null,
-  options?: { keepPreviousData?: boolean },
-) {
+export function useClinicalData<T>(path: string | null, options?: { keepPreviousData?: boolean }) {
   ensureCacheListeners();
   const cached = path ? (clinicalCache.get(path) as CacheEntry | undefined) : undefined;
   const [data, setData] = useState<T | null>(() => (cached ? (cached.data as T) : null));
@@ -215,37 +212,48 @@ export function VisitTimeline({
   admin?: boolean;
 }) {
   return (
-    <div className="surface overflow-hidden">
+    <div className="surface divide-y divide-border overflow-hidden">
       {visits.length ? (
-        visits.map((v) => (
-          <Link
-            key={v.id}
-            to={admin ? "/admin/visits/$visitId" : "/patient/visit/$visitId"}
-            params={{ visitId: v.id }}
-            className="block border-b border-border p-5 last:border-0 hover:bg-muted/40"
-          >
-            <div className="flex flex-wrap justify-between gap-2">
-              <p className="font-medium">{v.clinicName}</p>
-              <span className="text-xs text-muted-foreground">
-                {formatDateOnly(v.visitAt)} ·{" "}
-                {v.status === "completed" ? "Completed" : "In progress"}
-              </span>
-            </div>
-            <p className="mt-2 text-sm">
-              {admin ? (v as ClinicalVisit).reasonForVisit : v.patientSummary || "Visit summary"}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {v.diagnosis || "Diagnosis not released"}
-            </p>
-            <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
-              <span>{v.doctorName}</span>
-              <span>
-                {v.prescription.items.length ? "Prescription available" : "No prescription"}
-              </span>
-              {v.followUpDate && <span>Follow-up: {formatDateOnly(v.followUpDate)}</span>}
-            </div>
-          </Link>
-        ))
+        visits.map((v) => {
+          const content = (
+            <>
+              <div className="flex flex-wrap justify-between gap-2">
+                <p className="font-medium">{v.clinicName}</p>
+                <span className="text-xs text-muted-foreground">
+                  {formatDateOnly(v.visitAt)} ·{" "}
+                  {v.status === "completed" ? "Completed" : "In progress"}
+                </span>
+              </div>
+              <p className="mt-2 text-sm">
+                {admin ? (v as ClinicalVisit).reasonForVisit : v.patientSummary || "Visit summary"}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {v.diagnosis || "Diagnosis not released"}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                <span>{v.doctorName}</span>
+                <span>
+                  {v.prescription.items.length ? "Prescription available" : "No prescription"}
+                </span>
+                {v.followUpDate && <span>Follow-up: {formatDateOnly(v.followUpDate)}</span>}
+              </div>
+            </>
+          );
+          return admin ? (
+            <Link
+              key={v.id}
+              to="/admin/visits/$visitId"
+              params={{ visitId: v.id }}
+              className="block p-5 hover:bg-muted/40"
+            >
+              {content}
+            </Link>
+          ) : (
+            <article key={v.id} className="p-5">
+              {content}
+            </article>
+          );
+        })
       ) : (
         <p className="p-8 text-sm text-muted-foreground">
           No clinical visits yet. Previous queue tokens remain in queue history.
@@ -277,9 +285,7 @@ export function PrescriptionView({
         <div className="text-sm">
           <p className="font-medium">Prescription</p>
           <p>{visit.doctorName}</p>
-          <p>
-            {formatDateOnly(visit.prescription.prescribedAt ?? visit.visitAt)}
-          </p>
+          <p>{formatDateOnly(visit.prescription.prescribedAt ?? visit.visitAt)}</p>
         </div>
       </div>
       <p className="my-5 text-sm">
@@ -360,8 +366,7 @@ export function PatientVisitView({
           <section className="visit-summary-sheet surface space-y-5 p-6">
             <PrintBranding clinicId={visit.clinicId} />
             <p className="text-sm">
-              {visit.patientName} · {visit.clinicName} ·{" "}
-              {formatDateOnly(visit.visitAt)}
+              {visit.patientName} · {visit.clinicName} · {formatDateOnly(visit.visitAt)}
             </p>
             {[
               ["Visit summary", visit.patientSummary],

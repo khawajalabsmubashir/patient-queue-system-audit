@@ -73,27 +73,27 @@ function Profile() {
   };
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6">
-      <PageHeader
-        title="Profile & Account"
-        sub="Manage your personal details and account security."
-      />
+    <div className="space-y-5 sm:space-y-6">
+      <div className="surface p-5 sm:p-6">
+        <PageHeader
+          title="Profile & Account"
+          sub="Manage your personal details and account security."
+        />
 
-      <section className="surface p-5 sm:p-7">
-        <div className="flex items-center gap-3.5 border-b border-border pb-4">
+        <div className="flex items-center gap-3.5 border-y border-border py-4">
           <div className="grid size-11 shrink-0 place-items-center rounded-full bg-primary text-base font-bold text-primary-foreground">
             {initialsOf(p.fullName)}
           </div>
-          <div>
-            <h2 className="text-lg font-semibold text-foreground">Personal Details</h2>
-            <p className="text-sm text-muted-foreground">
+          <div className="min-w-0">
+            <h2 className="text-base font-semibold text-foreground sm:text-lg">Personal Details</h2>
+            <p className="text-xs text-muted-foreground sm:text-sm">
               One patient profile, shared across your clinics.
             </p>
           </div>
         </div>
 
         <form onSubmit={save} className="mt-5 space-y-5">
-          <div className="grid gap-5 sm:grid-cols-2">
+          <div className="grid gap-4 sm:grid-cols-2 sm:gap-5">
             <Field
               label="Full name"
               name="fullName"
@@ -123,7 +123,7 @@ function Profile() {
               <SelectField
                 name="gender"
                 defaultValue={p.gender}
-                className="mt-2 block h-11 w-full rounded-lg border border-input bg-card px-3"
+                className="mt-1.5 block h-11 w-full rounded-lg border border-input bg-card px-3"
               >
                 {[
                   ["", "Not provided"],
@@ -151,27 +151,33 @@ function Profile() {
             </p>
           )}
           <div className="flex justify-end">
-            <Btn disabled={busy}>{busy ? "Saving…" : "Save Personal Details"}</Btn>
+            <Btn disabled={busy} className="min-h-11 w-full sm:min-h-10 sm:w-auto">
+              {busy ? "Saving…" : "Save Personal Details"}
+            </Btn>
           </div>
         </form>
-      </section>
+      </div>
 
       <AccountSecurityPanel embedded />
 
-      <section className="surface p-5 sm:p-7">
-        <h2 className="text-lg font-semibold text-foreground">Doctor-recorded information</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Contact your clinic to correct clinical information.
-        </p>
-        <dl className="mt-5 grid gap-5 sm:grid-cols-3">
+      <section className="surface p-5 sm:p-6">
+        <div className="border-b border-border pb-4">
+          <h2 className="text-lg font-semibold text-foreground">Doctor-recorded information</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Contact your clinic to update allergies, chronic conditions, or medications.
+          </p>
+        </div>
+        <dl className="mt-5 grid gap-4 sm:grid-cols-3">
           {[
             ["Allergies", p.allergies],
             ["Chronic conditions", p.chronicConditions],
             ["Current medications", p.currentMedications],
           ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-sm font-medium text-foreground">{label}</dt>
-              <dd className="mt-1.5 whitespace-pre-wrap text-sm text-muted-foreground">
+            <div key={label} className="rounded-xl border border-border bg-muted/35 p-4">
+              <dt className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {label}
+              </dt>
+              <dd className="mt-1.5 whitespace-pre-wrap break-words text-sm text-foreground">
                 {value || "None recorded"}
               </dd>
             </div>

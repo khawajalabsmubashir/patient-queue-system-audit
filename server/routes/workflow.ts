@@ -56,25 +56,21 @@ export async function appointmentFlow(db: Database, clinic: string, date?: strin
 export function workflowRoutes(db: Database, notify: Notify) {
   const r = Router(),
     admin = requireRole(db, "admin");
-    r.get("/staff/appointment-flow", requireRole(db), async (req, res) => {
-      const u = res.locals["user"] as UserRow;
-      const clinic = scope(req.query["clinicId"]);
-  
-      if (clinic === "all" && u.role !== "admin") {
-        throw new ApiError(
-          403,
-          "CLINIC_FORBIDDEN",
-          "A specific assigned clinic is required.",
-        );
-      }
-  
-      await authorizeClinic(db, u, clinic, ["receptionist", "nurse"]);
-  
-      res.json({
-        success: true,
-        data: await appointmentFlow(db, clinic),
-      });
+  r.get("/staff/appointment-flow", requireRole(db), async (req, res) => {
+    const u = res.locals["user"] as UserRow;
+    const clinic = scope(req.query["clinicId"]);
+
+    if (clinic === "all" && u.role !== "admin") {
+      throw new ApiError(403, "CLINIC_FORBIDDEN", "A specific assigned clinic is required.");
+    }
+
+    await authorizeClinic(db, u, clinic, ["receptionist", "nurse"]);
+
+    res.json({
+      success: true,
+      data: await appointmentFlow(db, clinic),
     });
+  });
   r.get("/admin/appointment-flow", admin, async (req, res) =>
     res.json({ success: true, data: await appointmentFlow(db, scope(req.query["clinicId"])) }),
   );

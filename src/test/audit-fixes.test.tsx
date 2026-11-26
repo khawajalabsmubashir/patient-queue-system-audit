@@ -114,7 +114,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
       search: _search,
       activeProps: _activeProps,
       ...rest
-    }: any) => (
+    }: Record<string, unknown>) => (
       <a
         {...rest}
         href={typeof to === "string" ? to : "#"}
@@ -262,7 +262,7 @@ describe("Audit fixes verification", () => {
   });
 
   it("Fix 4: Conditions dropdown reveals 'Other condition' input when 'Other' is selected", async () => {
-    mocks.api.mockImplementation((path: string, opts?: any) => {
+    mocks.api.mockImplementation((path: string, opts?: { method?: string }) => {
       if (opts?.method === "POST") return Promise.resolve({ id: "c-new", name: "Sciatica" });
       if (path.includes("/conditions") && !path.includes("/patients/")) {
         return Promise.resolve([{ id: "c1", name: "Migraine" }]);
@@ -322,7 +322,7 @@ describe("Audit fixes verification", () => {
       },
       doctor: null,
     });
-    mocks.pathname = "/patient/visits";
+    mocks.pathname = "/patient/appointments";
     const PatientComponent = PatientRoute.options.component!;
     const { unmount } = render(<PatientComponent />);
 
@@ -338,11 +338,11 @@ describe("Audit fixes verification", () => {
     const header = document.querySelector("header")!;
     expect(within(header).queryByRole("button", { name: /^Sign Out$/i })).toBeNull();
 
-    // QueueBoundary remains omitted on non-queue visits route
+    // QueueBoundary remains omitted on non-Home appointments route
     expect(screen.queryByTestId("queue-boundary")).toBeNull();
     expect(screen.getByTestId("route-outlet")).toBeVisible();
 
-    // Footer is NOT rendered on non-Home pages (/patient/visits)
+    // Footer is NOT rendered on non-Home pages (/patient/appointments)
     expect(document.querySelector("footer")).toBeNull();
 
     // Profile dropdown includes ONLY Profile & Account and Sign Out -> confirmation prompt without scroll-lock
@@ -363,23 +363,35 @@ describe("Audit fixes verification", () => {
     expect(dialog).toHaveTextContent(/Are you sure you want to sign out/i);
     unmount();
 
-    // Footer IS rendered on Patient Home (/patient/dashboard)
+    // Footer IS rendered on Patient Home (/patient/dashboard) with Neuro Medical Clinic contact info & NO opening hours
     mocks.pathname = "/patient/dashboard";
     render(<PatientComponent />);
     const footer = document.querySelector("footer")!;
     expect(footer).not.toBeNull();
     expect(footer.className).toContain("bg-[#0d4633]");
-    expect(footer).toHaveTextContent("Health Point");
-    expect(footer).toHaveTextContent("Plot 12, Clifton Block 5");
-    expect(footer).toHaveTextContent("03001112233");
+    expect(footer).toHaveTextContent("Neuro Medical Clinic");
+    expect(footer).toHaveTextContent("Dr. Umar Zafar Ali");
+    expect(footer).toHaveTextContent("Saddar, Rawalpindi, 46000");
+    expect(footer).toHaveTextContent("+92 304 540 5530");
+    expect(footer).toHaveTextContent("+92 333 331 1042");
+    expect(footer).toHaveTextContent("(051) 6128100");
+    expect(footer).toHaveTextContent("clinicneurology4@gmail.com");
+    expect(footer).not.toHaveTextContent(/9:00 AM|5:00 PM|Today ·/i);
     expect(footer).toHaveTextContent(/All rights reserved/i);
+    expect(
+      within(footer).getByRole("link", { name: /Dr\. Umar Zafar Contact Page/i }),
+    ).toHaveAttribute("href", "https://drumarzafar.com/contact-us/");
     expect(within(footer).getByRole("link", { name: /Get directions/i })).toBeVisible();
     expect(within(footer).getByRole("link", { name: /Profile & Account/i })).toHaveAttribute(
       "href",
       "/patient/profile",
     );
-    fireEvent.click(within(footer).getByRole("button", { name: "FAQs" }));
-    expect(await screen.findByRole("dialog")).toHaveTextContent(/Patient FAQs/i);
+    expect(within(footer).queryByRole("link", { name: /Live queue/i })).toBeNull();
+    expect(within(footer).queryByRole("link", { name: /My visits/i })).toBeNull();
+    expect(within(footer).queryByRole("link", { name: /Prescriptions/i })).toBeNull();
+    expect(within(footer).queryByRole("link", { name: /Medical documents/i })).toBeNull();
+    fireEvent.click(within(footer).getByRole("button", { name: "Privacy policy" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/Privacy policy/i);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   });
 
@@ -418,7 +430,7 @@ describe("Audit fixes verification", () => {
       month: "2-digit",
       day: "2-digit",
     }).format(new Date());
-    mocks.api.mockImplementation((path: string, opts?: any) => {
+    mocks.api.mockImplementation((path: string, _opts?: unknown) => {
       if (path.includes("/staff/appointment-flow")) {
         return Promise.resolve([
           {
@@ -968,12 +980,11 @@ describe("Audit fixes verification", () => {
     expect(within(heroSection).queryByRole("link", { name: /Live queue/i })).toBeNull();
     expect(screen.queryByRole("region", { name: "Quick actions" })).toBeNull();
 
-    // Live queue link at top corner of the queue box + Token HP-001 + NO Give up token on Home
+    // Live queue indicator at top corner is animation-only & non-clickable + Token HP-001 + NO Give up token on Home
     const queueSection = screen.getByRole("region", { name: "Live queue status" });
-    expect(within(queueSection).getByRole("link", { name: /Live queue/i })).toHaveAttribute(
-      "href",
-      "/patient/live-queue",
-    );
+    expect(within(queueSection).queryByRole("link", { name: /Live queue/i })).toBeNull();
+    expect(within(queueSection).queryByRole("button", { name: /Live queue/i })).toBeNull();
+    expect(within(queueSection).getByLabelText("Live queue indicator")).toBeVisible();
     expect((await within(queueSection).findAllByText("HP-001")).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("button", { name: /Give up token/i })).toBeNull();
 
@@ -991,7 +1002,7 @@ describe("Audit fixes verification", () => {
     ).toBeVisible();
     expect(within(followupRegion).getByText("Pending")).toBeVisible();
 
-    // History & My Visits shows date selector + Download PDF link without Consultation with Dr. subtitle
+    // History & My Visits shows date selector + Download PDF link without View visit summary or My visits links
     const historySection = screen.getByRole("region", { name: "History and my visits" });
     expect(
       within(historySection).getByRole("heading", { name: "History & My Visits" }),
@@ -1001,6 +1012,8 @@ describe("Audit fixes verification", () => {
         name: /Download Your Prescription \(PDF\)/i,
       }),
     ).toHaveAttribute("href", "/api/patient/visits/visit-1/prescription-pdf");
+    expect(within(historySection).queryByRole("link", { name: /View visit summary/i })).toBeNull();
+    expect(within(historySection).queryByRole("link", { name: /My visits/i })).toBeNull();
     expect(within(historySection).queryByText(/Consultation with Dr./i)).toBeNull();
     expect(within(historySection).queryByText(/Ayesha Mahmood/i)).toBeNull();
   });

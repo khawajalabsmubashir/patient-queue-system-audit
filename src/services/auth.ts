@@ -35,11 +35,7 @@ export async function restoreSession() {
       );
   }
 }
-export async function login(
-  email: string,
-  password: string,
-  portal: "patient" | "staff",
-) {
+export async function login(email: string, password: string, portal: "patient" | "staff") {
   const request = ++revision;
   const profile = await api<UserProfile>("/auth/login", {
     method: "POST",

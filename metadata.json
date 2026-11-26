@@ -1,0 +1,6 @@
+{
+  "name": "Neuro Spine Care Center",
+  "description": "Patient appointment, live queue token tracking, and clinical management system.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -20,15 +20,6 @@ import { useAuth } from "@/providers/auth-provider";
 import { useClinicContext } from "@/providers/clinic-provider";
 import type { PatientVisit } from "@/types/clinical";
 import type { Appointment } from "@/types/local";
-
-interface DashboardFollowUp {
-  id: string;
-  clinic_id?: string;
-  follow_up_date: string;
-  clinic_name: string;
-  instructions: string;
-  status: string;
-}
 import { clinicDayKey } from "@/utils/clinic-date";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import {
@@ -44,6 +35,15 @@ import {
   Users,
 } from "lucide-react";
 
+interface DashboardFollowUp {
+  id: string;
+  clinic_id?: string;
+  follow_up_date: string;
+  clinic_name: string;
+  instructions: string;
+  status: string;
+}
+
 export const Route = createFileRoute("/patient/dashboard")({ component: Dashboard });
 
 export function QueueHero() {
@@ -55,7 +55,7 @@ export function QueueHero() {
   return (
     <section aria-label="Your queue status" className="surface token-in overflow-hidden">
       <div className="grid md:grid-cols-[1.15fr_0.85fr]">
-        <div className="flex flex-col justify-between border-b border-border p-7 md:border-b-0 md:border-r md:p-9">
+        <div className="flex flex-col justify-between border-b border-border p-6 md:border-b-0 md:border-r md:p-8">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <span className="text-xs font-medium text-muted-foreground">{clinic.name}</span>
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-primary">
@@ -165,9 +165,7 @@ function UnifiedTokenQueueCard() {
 
   const today = clinicDayKey();
   const hasClinicFilter = Boolean(selected && selected !== "all");
-  const selectedClinic = hasClinicFilter
-    ? clinics.find((c) => c.id === selected)
-    : clinics[0];
+  const selectedClinic = hasClinicFilter ? clinics.find((c) => c.id === selected) : clinics[0];
   const scopedAppointments = sortPatientAppointments(
     (appts.data ?? []).filter((a) => !hasClinicFilter || a.clinicId === selected),
     today,
@@ -200,7 +198,6 @@ function UnifiedTokenQueueCard() {
     });
   };
 
-  // Derive display values from simulation when active, otherwise real live queue state
   let mode: "idle" | "waiting" | "serving" | "done" | "none" = "none";
   let nowServingVal = "--";
   let aheadVal = "--";
@@ -300,7 +297,11 @@ function UnifiedTokenQueueCard() {
       ...(serving ? [{ token: serving.token, tag: "Now Serving" }] : []),
       {
         token: realToken,
-        tag: open ? (nextAppointment.scheduledAt.startsWith(today) ? "Scheduled today" : formatDateOnly(nextAppointment.scheduledAt.slice(0, 10))) : "Waiting for queue to open",
+        tag: open
+          ? nextAppointment.scheduledAt.startsWith(today)
+            ? "Scheduled today"
+            : formatDateOnly(nextAppointment.scheduledAt.slice(0, 10))
+          : "Waiting for queue to open",
         isYou: true,
       },
     ];
@@ -328,31 +329,25 @@ function UnifiedTokenQueueCard() {
           : "bg-muted/50 border-border";
 
   return (
-    <section
-      aria-label="Live queue status"
-      className="surface overflow-hidden"
-    >
-      {/* Card Top Header: Day, Date & Clinic Name + Live queue link in top-right corner */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-4 sm:px-7">
-        <h2 className="text-base font-bold text-foreground sm:text-lg">
+    <section aria-label="Live queue status" className="surface overflow-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-4 sm:px-6">
+        <h2 className="min-w-0 break-words text-base font-bold text-foreground sm:text-lg">
           {headerDate} &bull; {headerClinic}
         </h2>
-        <Link
-          to="/patient/live-queue"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/25 bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15"
+        <div
+          aria-label="Live queue indicator"
+          className="inline-flex shrink-0 select-none items-center gap-2 rounded-lg border border-primary/25 bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary"
         >
-          {open && <LiveDot />}
+          <LiveDot />
           <span>Live queue</span>
-        </Link>
+        </div>
       </div>
 
-      {/* Unified 2-Column Content */}
       <div className="grid grid-cols-1 divide-y divide-border lg:grid-cols-12 lg:divide-x lg:divide-y-0">
-        {/* Left Panel: Your Token & Minimal Tracking Bar (NO Give up token on Home) */}
-        <div className="flex flex-col justify-between bg-card p-5 sm:p-7 lg:col-span-6">
+        <div className="flex flex-col justify-between bg-card p-5 sm:p-6 lg:col-span-6">
           <div>
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:text-sm">
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                 Your Token
               </span>
               {isSimulating && (
@@ -371,8 +366,8 @@ function UnifiedTokenQueueCard() {
                 {activeToken || "—"}
               </div>
               {!activeToken && !isSimulating && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  No upcoming appointment token yet. Book an appointment or click Simulate Queue to
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                  No upcoming appointment token yet. Book an appointment or use Simulate Queue to
                   preview.
                 </p>
               )}
@@ -381,7 +376,7 @@ function UnifiedTokenQueueCard() {
 
           <div className={`rounded-2xl border p-4 transition-colors sm:p-5 ${boxTone}`}>
             <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
-              <div className="flex items-center gap-2">
+              <div className="flex min-w-0 items-center gap-2">
                 <span className="shrink-0 text-primary">
                   {mode === "serving" || mode === "done" ? (
                     <Check className="size-4" aria-hidden="true" />
@@ -424,11 +419,12 @@ function UnifiedTokenQueueCard() {
           </div>
         </div>
 
-        {/* Right Panel: Simple Queue Stats & Queue Line */}
-        <div className="flex flex-col justify-between bg-card p-5 sm:p-7 lg:col-span-6">
+        <div className="flex flex-col justify-between bg-card p-5 sm:p-6 lg:col-span-6">
           <dl className="mb-5 grid grid-cols-3 gap-2.5 sm:gap-3">
             <div className="rounded-xl border border-border bg-muted/40 p-3 text-center sm:p-3.5">
-              <dt className="text-xs font-medium text-muted-foreground">Now Serving</dt>
+              <dt className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                Now Serving
+              </dt>
               <dd
                 className={`tabular mt-1 text-lg font-extrabold sm:text-xl ${
                   nowServingVal !== "--" ? "text-primary" : "text-muted-foreground"
@@ -438,7 +434,7 @@ function UnifiedTokenQueueCard() {
               </dd>
             </div>
             <div className="rounded-xl border border-border bg-muted/40 p-3 text-center sm:p-3.5">
-              <dt className="text-xs font-medium text-muted-foreground">Ahead</dt>
+              <dt className="text-[11px] font-medium text-muted-foreground sm:text-xs">Ahead</dt>
               <dd
                 className={`tabular mt-1 text-lg font-extrabold sm:text-xl ${
                   aheadVal !== "--" ? "text-foreground" : "text-muted-foreground"
@@ -448,11 +444,13 @@ function UnifiedTokenQueueCard() {
               </dd>
             </div>
             <div className="rounded-xl border border-border bg-muted/40 p-3 text-center sm:p-3.5">
-              <dt className="text-xs font-medium text-muted-foreground">Est. Wait</dt>
+              <dt className="text-[11px] font-medium text-muted-foreground sm:text-xs">
+                Est. Wait
+              </dt>
               <dd
                 className={`tabular mt-1 text-base font-bold sm:text-lg ${
                   estWaitVal === "Now"
-                    ? "text-primary font-extrabold"
+                    ? "font-extrabold text-primary"
                     : estWaitVal !== "--"
                       ? "text-foreground"
                       : "text-muted-foreground"
@@ -470,7 +468,7 @@ function UnifiedTokenQueueCard() {
                 queueRows.map((row, index) => (
                   <div
                     key={`${row.token}-${index}`}
-                    className={`flex items-center justify-between rounded-xl border px-3.5 py-2.5 text-sm ${
+                    className={`flex items-center justify-between gap-3 rounded-xl border px-3.5 py-2.5 text-sm ${
                       row.isNow
                         ? "border-primary bg-primary-soft"
                         : row.isYou
@@ -479,7 +477,7 @@ function UnifiedTokenQueueCard() {
                     }`}
                   >
                     <span
-                      className={`tabular font-semibold ${
+                      className={`tabular truncate font-semibold ${
                         row.isNow
                           ? "font-extrabold text-primary"
                           : row.isYou
@@ -490,7 +488,7 @@ function UnifiedTokenQueueCard() {
                       {row.token}
                     </span>
                     <span
-                      className={`tabular text-xs font-semibold ${
+                      className={`tabular shrink-0 text-xs font-semibold ${
                         row.isNow
                           ? "font-extrabold text-primary"
                           : row.isYou
@@ -536,7 +534,7 @@ function FollowUpSmallMessage() {
   return (
     <section
       aria-label="Follow-up message"
-      className="flex flex-col justify-between gap-2.5 rounded-2xl border border-border bg-card px-5 py-3.5 sm:flex-row sm:items-center sm:px-6"
+      className="surface flex flex-col justify-between gap-2.5 px-5 py-4 sm:flex-row sm:items-center sm:px-6"
     >
       <div className="flex min-w-0 items-start gap-3 sm:items-center">
         <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-primary-soft text-primary">
@@ -584,14 +582,12 @@ function HistoryMyVisitsCard() {
     scopedVisits.find((v) => v.id === selectedVisitId) ?? scopedVisits[0] ?? null;
 
   return (
-    <section aria-label="History and my visits" className="surface p-5 sm:p-7">
+    <section aria-label="History and my visits" className="surface p-5 sm:p-6">
       <div className="flex flex-col gap-4 border-b border-border pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-lg font-bold text-foreground sm:text-xl">
-            History &amp; My Visits
-          </h2>
+          <h2 className="text-lg font-bold text-foreground sm:text-xl">History &amp; My Visits</h2>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Select any past visit date to view and download your prescription PDF.
+            Select a past visit date to download your prescription PDF.
           </p>
         </div>
 
@@ -601,7 +597,7 @@ function HistoryMyVisitsCard() {
               <button
                 type="button"
                 aria-label="Select past visit"
-                className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-left text-sm font-semibold text-foreground transition hover:bg-muted sm:w-auto sm:text-base"
+                className="flex w-full items-center justify-between gap-3 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-left text-sm font-semibold text-foreground transition hover:bg-muted sm:w-auto"
               >
                 <span className="flex items-center gap-2">
                   <Calendar className="size-4 shrink-0 text-primary" aria-hidden="true" />
@@ -638,10 +634,10 @@ function HistoryMyVisitsCard() {
       </div>
 
       {selectedVisit ? (
-        <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-6">
+        <div className="mt-5 flex flex-col gap-4 rounded-2xl border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="flex items-start gap-3.5">
-            <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary-soft text-primary">
-              <FileText className="size-6" aria-hidden="true" />
+            <div className="grid size-11 shrink-0 place-items-center rounded-xl border border-primary/25 bg-primary-soft text-primary sm:size-12">
+              <FileText className="size-5 sm:size-6" aria-hidden="true" />
             </div>
             <div className="min-w-0">
               <span className="mb-1 inline-block rounded-md border border-primary/25 bg-primary-soft px-2.5 py-0.5 text-xs font-semibold text-primary">
@@ -652,41 +648,30 @@ function HistoryMyVisitsCard() {
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 {selectedVisit.prescription.items.length > 0
-                  ? `${selectedVisit.prescription.items.length} prescribed item(s) · `
-                  : ""}
-                <Link
-                  to="/patient/visit/$visitId"
-                  params={{ visitId: selectedVisit.id }}
-                  className="font-medium text-primary hover:underline"
-                >
-                  View visit summary
-                </Link>
+                  ? `${selectedVisit.prescription.items.length} prescribed item(s) · Ready for download`
+                  : "Prescription PDF ready for download"}
               </p>
             </div>
           </div>
 
           <a
             download
-            href={"/api/patient/visits/" + encodeURIComponent(selectedVisit.id) + "/prescription-pdf"}
-            className="inline-flex w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-soft transition hover:bg-primary-hover sm:w-auto"
+            href={
+              "/api/patient/visits/" + encodeURIComponent(selectedVisit.id) + "/prescription-pdf"
+            }
+            className="inline-flex min-h-11 w-full shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground shadow-soft transition hover:bg-primary-hover sm:w-auto"
           >
             <Download className="size-4" aria-hidden="true" />
             <span>Download Your Prescription (PDF)</span>
           </a>
         </div>
       ) : (
-        <div className="mt-5 flex flex-col justify-between gap-3 rounded-2xl border border-border bg-muted/40 p-5 sm:flex-row sm:items-center">
+        <div className="mt-5 rounded-2xl border border-border bg-muted/40 p-5">
           <p className="text-sm text-muted-foreground">
             {visitsRemote.error
               ? visitsRemote.error
               : "No past visits yet. Completed clinic visits and prescription PDFs will appear here."}
           </p>
-          <Link
-            to="/patient/visits"
-            className="shrink-0 text-sm font-semibold text-primary hover:underline"
-          >
-            My visits →
-          </Link>
         </div>
       )}
     </section>
@@ -698,8 +683,7 @@ function Dashboard() {
   const fullName = profile?.fullName?.trim() || "Patient";
 
   return (
-    <div className="space-y-6">
-      {/* Clean Welcome Greeting + Book Appointment */}
+    <div className="space-y-5 sm:space-y-6">
       <section className="surface flex flex-col justify-between gap-4 p-5 sm:flex-row sm:items-center sm:p-6">
         <div className="min-w-0">
           <h1 className="break-words [overflow-wrap:anywhere] text-xl font-bold tracking-tight text-foreground sm:text-2xl">
@@ -714,20 +698,19 @@ function Dashboard() {
           <Link
             to="/patient/appointments"
             search={{ book: "1" } as never}
-            className="w-full sm:w-auto"
+            className="block w-full sm:w-auto"
           >
-            <Btn className="w-full font-bold sm:w-auto">+ Book Appointment</Btn>
+            <Btn className="min-h-11 w-full font-bold sm:min-h-10 sm:w-auto">
+              + Book Appointment
+            </Btn>
           </Link>
         </div>
       </section>
 
-      {/* Section 1: Unified Token & Live Queue Card */}
       <UnifiedTokenQueueCard />
 
-      {/* Small Follow-up Message */}
       <FollowUpSmallMessage />
 
-      {/* Section 2: History & My Visits Card */}
       <HistoryMyVisitsCard />
     </div>
   );

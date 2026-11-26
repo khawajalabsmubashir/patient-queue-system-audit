@@ -17,9 +17,9 @@ export type DataRow = Record<
   | "amount"
   | "balance"
   | "follow_up_date",
-  any
+  unknown
 > &
-  Record<string, any>;
+  Record<string, unknown>;
 export const wallTime = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)

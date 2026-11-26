@@ -102,13 +102,13 @@ export function PageHeader({
   right?: ReactNode;
 }) {
   return (
-    <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
+    <div className="mb-6 flex flex-col gap-3 sm:mb-7 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
       <div className="min-w-0 flex-1">
-        <h1 className="break-words [overflow-wrap:anywhere] text-[28px] font-semibold tracking-tight md:text-[32px]">
+        <h1 className="break-words [overflow-wrap:anywhere] text-2xl font-bold tracking-tight sm:text-[30px]">
           {title}
         </h1>
         {sub && (
-          <p className="mt-1.5 break-words [overflow-wrap:anywhere] text-[15px] text-muted-foreground">
+          <p className="mt-1 break-words [overflow-wrap:anywhere] text-sm text-muted-foreground sm:text-[15px]">
             {sub}
           </p>
         )}
@@ -158,7 +158,7 @@ export function Field({
             id={id}
             type={showPassword ? "text" : "password"}
             className={cn(
-              "h-11 w-full rounded-lg border border-input bg-card pl-3.5 pr-11 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10",
+              "h-11 w-full rounded-lg border border-input bg-card pl-3.5 pr-11 text-base outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-sm",
               p.className,
             )}
           />
@@ -186,7 +186,7 @@ export function Field({
       <input
         {...p}
         className={cn(
-          "h-11 w-full rounded-lg border border-input bg-card px-3.5 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10",
+          "h-11 w-full rounded-lg border border-input bg-card px-3.5 text-base outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10 sm:text-sm",
           p.className,
         )}
       />

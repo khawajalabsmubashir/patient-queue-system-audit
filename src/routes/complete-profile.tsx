@@ -5,7 +5,12 @@ import { AuthPage } from "@/components/auth-page";
 import { api } from "@/api/client";
 import { completeGoogleProfile } from "@/services/auth";
 import { friendlyError } from "@/services/errors";
-import { MAX_FULL_NAME_LENGTH, MAX_PHONE_LENGTH, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
+import {
+  MAX_FULL_NAME_LENGTH,
+  MAX_PHONE_LENGTH,
+  validatePersonName,
+  validatePhoneNumber,
+} from "@/domain/input-validation";
 export const Route = createFileRoute("/complete-profile")({
   head: () => ({ meta: [{ title: "Complete your profile — Neuro Spine Care Center" }] }),
   component: CompleteProfile,
@@ -40,9 +45,15 @@ export function CompleteProfile() {
             event.preventDefault();
             const data = new FormData(event.currentTarget);
             const nameCheck = validatePersonName(String(data.get("name") ?? ""), "Full name");
-            if (!nameCheck.ok) { setError(nameCheck.error); return; }
+            if (!nameCheck.ok) {
+              setError(nameCheck.error);
+              return;
+            }
             const phoneCheck = validatePhoneNumber(String(data.get("phone") ?? ""));
-            if (!phoneCheck.ok) { setError(phoneCheck.error); return; }
+            if (!phoneCheck.ok) {
+              setError(phoneCheck.error);
+              return;
+            }
             setBusy(true);
             setError("");
             try {

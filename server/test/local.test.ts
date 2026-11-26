@@ -206,7 +206,7 @@ test("local authentication, queue lifecycle, privacy, realtime and persistence",
         ).response.status,
         401,
       );
-    
+
       const result = await request<UserProfile>("/auth/login", "", {
         email: user.email,
         password,
@@ -214,7 +214,7 @@ test("local authentication, queue lifecycle, privacy, realtime and persistence",
       });
       assert.equal(result.response.status, 200);
       patient = result.cookie;
-    
+
       const old = patient;
       patient = (
         await request<UserProfile>("/auth/login", patient, {
@@ -223,7 +223,7 @@ test("local authentication, queue lifecycle, privacy, realtime and persistence",
           portal: "patient",
         })
       ).cookie;
-    
+
       assert.notEqual(patient, old);
       assert.equal((await request("/auth/me", old)).data, null);
     });

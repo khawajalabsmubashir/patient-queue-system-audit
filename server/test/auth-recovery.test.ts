@@ -5,8 +5,14 @@ import { createHash } from "node:crypto";
 import { createLocalApp } from "../app.ts";
 import { createPostgresDatabase } from "../db/postgres.ts";
 async function testApp(options: Parameters<typeof createLocalApp>[0]) {
- if(process.env["QUEUECARE_AUTH_TEST_SCHEMA"])options.database=await createPostgresDatabase(process.env["DATABASE_URL"]!,true,process.env["QUEUECARE_AUTH_TEST_SCHEMA"],()=>{});
- return createLocalApp(options);
+  if (process.env["QUEUECARE_AUTH_TEST_SCHEMA"])
+    options.database = await createPostgresDatabase(
+      process.env["DATABASE_URL"]!,
+      true,
+      process.env["QUEUECARE_AUTH_TEST_SCHEMA"],
+      () => {},
+    );
+  return createLocalApp(options);
 }
 import type { GoogleIdentity } from "../services/identity.ts";
 
@@ -93,11 +99,13 @@ test("password recovery updates QueueCare hash once, expires, revokes sessions a
     assert.deepEqual(attempts.map((x) => x.status).sort(), [200, 400]);
     assert.equal((await req("/me", undefined, registered.cookie)).data.data, null);
     assert.equal(
-      (await req("/login", {
-        email: "reset@example.com",
-        password: "OldPassword123!",
-        portal: "patient",
-      })).status,
+      (
+        await req("/login", {
+          email: "reset@example.com",
+          password: "OldPassword123!",
+          portal: "patient",
+        })
+      ).status,
       401,
     );
     const login = await req("/login", {

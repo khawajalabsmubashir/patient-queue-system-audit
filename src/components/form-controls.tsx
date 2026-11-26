@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 
 const emptyOption = "__queuecare_empty_option__";
 const fieldClass =
-  "h-11 rounded-lg border border-input bg-card px-3.5 text-sm outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-50";
+  "h-11 rounded-lg border border-input bg-card px-3.5 text-base outline-none transition focus:border-primary focus:ring-4 focus:ring-primary/10 disabled:opacity-50 sm:text-sm";
 
 function optionsFrom(
   children: React.ReactNode,
@@ -106,7 +106,10 @@ export function SelectField({
             )}
           >
             <span className="min-w-0 truncate">{displayLabel}</span>
-            <ChevronDown className="size-4 shrink-0 text-muted-foreground opacity-70" aria-hidden="true" />
+            <ChevronDown
+              className="size-4 shrink-0 text-muted-foreground opacity-70"
+              aria-hidden="true"
+            />
           </button>
         </PopoverTrigger>
         <PopoverContent
@@ -117,7 +120,11 @@ export function SelectField({
           className="thin-scrollbar max-h-64 w-auto min-w-[max(var(--radix-popover-trigger-width),10rem)] max-w-[calc(100vw-2rem)] overflow-y-auto rounded-lg border border-border bg-card p-1 shadow-md"
           onCloseAutoFocus={(e) => e.preventDefault()}
         >
-          <div role="listbox" aria-label={props["aria-label"] ?? "Options"} className="flex flex-col gap-0.5">
+          <div
+            role="listbox"
+            aria-label={props["aria-label"] ?? "Options"}
+            className="flex flex-col gap-0.5"
+          >
             {options.map((option) => {
               const val = optionValue(option);
               const isSelected = val === selected;
@@ -135,7 +142,9 @@ export function SelectField({
                   )}
                 >
                   <span className="truncate">{option.props.children}</span>
-                  {isSelected && <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />}
+                  {isSelected && (
+                    <Check className="size-4 shrink-0 text-primary" aria-hidden="true" />
+                  )}
                 </button>
               );
             })}
@@ -184,9 +193,9 @@ export function TemporalInput({
   const input = React.useRef<HTMLInputElement>(null);
 
   React.useLayoutEffect(() => {
-    const dialogEl = (wrapper.current?.closest("[role=\"dialog\"]") as HTMLElement | null) ?? null;
+    const dialogEl = (wrapper.current?.closest('[role="dialog"]') as HTMLElement | null) ?? null;
     const scrollEl =
-      (wrapper.current?.closest("[data-dialog-body=\"true\"]") as HTMLElement | null) ?? null;
+      (wrapper.current?.closest('[data-dialog-body="true"]') as HTMLElement | null) ?? null;
     setDialogContainer(dialogEl);
     setScrollContainer(scrollEl);
   }, [open]);

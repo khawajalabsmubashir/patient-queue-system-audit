@@ -1,16 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import {
-  Bell,
-  CalendarCheck,
-  FileText,
-  Pill,
-  Receipt,
-  Stethoscope,
-  Ticket,
-  X,
-} from "lucide-react";
+import { Bell, CalendarCheck, FileText, Pill, Receipt, Stethoscope, Ticket, X } from "lucide-react";
 import { api } from "@/api/client";
+import { useAppNavigate } from "@/components/app-link";
 import { Btn } from "@/components/qc";
 import { useAuth } from "@/providers/auth-provider";
 import { friendlyError } from "@/services/errors";
@@ -51,11 +43,9 @@ export function notificationHref(n: AppNotification, role: string) {
   const patient = role === "patient";
   switch (n.entity_type) {
     case "visit":
-      return patient
-        ? "/patient/visit/" + encodeURIComponent(n.entity_id)
-        : "/admin/visits/" + encodeURIComponent(n.entity_id);
+      return patient ? "/patient/dashboard" : "/admin/visits/" + encodeURIComponent(n.entity_id);
     case "prescription":
-      return "/patient/prescription/" + encodeURIComponent(n.entity_id);
+      return patient ? "/patient/dashboard" : "/admin/visits/" + encodeURIComponent(n.entity_id);
     case "invoice":
       return (
         (patient ? "/patient/billing" : "/admin/billing") +
@@ -63,7 +53,7 @@ export function notificationHref(n: AppNotification, role: string) {
         encodeURIComponent(n.entity_id)
       );
     case "document":
-      return patient ? "/patient/documents" : "/admin/documents";
+      return patient ? "/patient/appointments" : "/admin/documents";
     case "appointment":
       return patient
         ? "/patient/appointments"
@@ -71,7 +61,7 @@ export function notificationHref(n: AppNotification, role: string) {
           ? "/admin/appointments"
           : "/staff";
     default:
-      return patient ? "/patient/live-queue" : role === "admin" ? "/admin/live-queue" : "/staff";
+      return patient ? "/patient/dashboard" : role === "admin" ? "/admin/live-queue" : "/staff";
   }
 }
 
@@ -127,6 +117,7 @@ function notificationMeta(n: AppNotification) {
 
 export function NotificationCenter() {
   const { profile } = useAuth();
+  const appNavigate = useAppNavigate();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<DateFilter>("all");
@@ -181,7 +172,11 @@ export function NotificationCenter() {
       else if (day === yesterdayKey) yesterdayItems.push(item);
       else olderItems.push(item);
     }
-    const groups: { key: "today" | "yesterday" | "older"; label: string; list: AppNotification[] }[] = [];
+    const groups: {
+      key: "today" | "yesterday" | "older";
+      label: string;
+      list: AppNotification[];
+    }[] = [];
     if ((filter === "all" || filter === "today") && todayItems.length) {
       groups.push({ key: "today", label: "Today", list: todayItems });
     }
@@ -306,11 +301,11 @@ export function NotificationCenter() {
                             onClick={(e) => {
                               e.preventDefault();
                               setOpen(false);
-                              void read(n.id).then(() =>
-                                window.location.assign(
-                                  notificationHref(n, profile?.role ?? "patient"),
-                                ),
-                              );
+                              const targetHref = notificationHref(n, profile?.role ?? "patient");
+                              void read(n.id).then(() => {
+                                if (appNavigate) appNavigate(targetHref);
+                                else window.location.assign(targetHref);
+                              });
                             }}
                             className="block"
                           >

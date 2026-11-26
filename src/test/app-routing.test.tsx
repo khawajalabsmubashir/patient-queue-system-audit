@@ -2,6 +2,7 @@ import { QueryClient } from "@tanstack/react-query";
 import { createRouter, rootRouteId } from "@tanstack/react-router";
 import { describe, expect, it } from "vitest";
 import { routeTree } from "@/routeTree.gen";
+
 describe("App routing", () => {
   it.each([
     "/",
@@ -11,14 +12,10 @@ describe("App routing", () => {
     "/reset-password",
     "/complete-profile",
     "/patient/dashboard",
-    "/patient/get-token",
-    "/patient/live-queue",
-    "/patient/history",
     "/patient/profile",
-    "/patient/visits",
-    "/patient/prescriptions",
-    "/patient/visit/visit-id",
-    "/patient/prescription/visit-id",
+    "/patient/appointments",
+    "/patient/appointment/appt-id",
+    "/patient/billing",
     "/admin/patient-record/patient-id",
     "/admin/visits/visit-id",
     "/admin",
@@ -40,17 +37,30 @@ describe("App routing", () => {
     "/admin/data-management",
     "/account",
     "/staff",
-    "/patient/appointments",
-    "/patient/documents",
-    "/patient/billing",
     "/public-display",
-    "/patient/join-queue",
-    "/patient/queue",
     "/admin/queue",
   ])("registers %s as a page rather than not found", (path) => {
     const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
     const matches = router.matchRoutes(path);
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
     expect(matches.at(-1)?.pathname.replace(/\/$/, "")).toBe(path.replace(/\/$/, ""));
+  });
+
+  it.each([
+    "/patient/live-queue",
+    "/patient/prescriptions",
+    "/patient/prescription/visit-id",
+    "/patient/visits",
+    "/patient/visit/visit-id",
+    "/patient/documents",
+    "/patient/queue",
+    "/patient/history",
+    "/patient/get-token",
+    "/patient/join-queue",
+  ])("drops removed patient route %s", (path) => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+    const matches = router.matchRoutes(path);
+    const leaf = matches.at(-1);
+    expect(leaf?.routeId === rootRouteId || leaf?.routeId === "/patient").toBe(true);
   });
 });

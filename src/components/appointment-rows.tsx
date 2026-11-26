@@ -153,24 +153,26 @@ export function AppointmentRows({
             <span className="block text-xs">{formatDateOnly(a.scheduledAt.slice(0, 10))}</span>
           </span>
           <div className="min-w-0">
-          {readOnly ? (
-            <span className="break-words [overflow-wrap:anywhere] font-medium">{a.patientName}</span>
-              ) : (
-                <a
-                  className="break-words [overflow-wrap:anywhere] font-medium hover:text-primary"
-                  href={
-                    "/admin/patient-record/" +
-                    a.patientId +
-                    "?clinicId=" +
-                    a.clinicId +
-                    "&appointmentId=" +
-                    a.id +
-                    (a.tokenId ? "&tokenId=" + a.tokenId : "")
-                  }
-                >
-                  {a.patientName}
-                </a>
-              )}
+            {readOnly ? (
+              <span className="break-words [overflow-wrap:anywhere] font-medium">
+                {a.patientName}
+              </span>
+            ) : (
+              <a
+                className="break-words [overflow-wrap:anywhere] font-medium hover:text-primary"
+                href={
+                  "/admin/patient-record/" +
+                  a.patientId +
+                  "?clinicId=" +
+                  a.clinicId +
+                  "&appointmentId=" +
+                  a.id +
+                  (a.tokenId ? "&tokenId=" + a.tokenId : "")
+                }
+              >
+                {a.patientName}
+              </a>
+            )}
             {profile?.role === "admin" && a.attention && (
               <div className="mt-2">
                 <AttentionBadges attention={a.attention} />

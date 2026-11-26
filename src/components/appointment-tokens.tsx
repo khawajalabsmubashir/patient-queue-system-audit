@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AppLink } from "@/components/app-link";
 import { Btn } from "@/components/qc";
 import { ConfirmAction } from "@/components/queue-feedback";
 import { useClinicalData } from "@/components/clinical";
@@ -139,11 +140,7 @@ function NextAppointmentCard({
     !["cancelled", "completed", "no_show"].includes(appointment.status ?? "");
   const isFuture = appointment.scheduledAt.slice(0, 10) > today;
   const weekday = formatWeekdayName(appointment.scheduledAt);
-  const metaLine = [
-    appointment.clinicName,
-    clinicMeta?.department,
-    clinicMeta?.doctorName,
-  ]
+  const metaLine = [appointment.clinicName, clinicMeta?.department, clinicMeta?.doctorName]
     .filter(Boolean)
     .join(" · ");
   const addressLine =
@@ -202,12 +199,12 @@ function NextAppointmentCard({
 
       <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
         <div className="flex flex-wrap items-center gap-2.5">
-          <a
+          <AppLink
             href={"/patient/appointment/" + appointment.id}
             className="inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground shadow-soft transition hover:bg-primary-hover whitespace-nowrap"
           >
             View details
-          </a>
+          </AppLink>
           <a
             download
             href={"/api/patient/tokens/" + encodeURIComponent(token.id) + "/pdf"}
@@ -298,12 +295,12 @@ export function AppointmentTokens() {
                   Later
                 </span>
                 {appointments.length > 3 && (
-                  <a
+                  <AppLink
                     href="/patient/appointments"
                     className="text-xs font-medium text-primary hover:underline"
                   >
                     View all ({appointments.length}) →
-                  </a>
+                  </AppLink>
                 )}
               </div>
               <div className="mt-2.5 divide-y divide-border">
@@ -321,12 +318,12 @@ export function AppointmentTokens() {
                     </p>
                     <div className="flex shrink-0 items-center gap-3">
                       <AppointmentStatusBadge status={a.status} />
-                      <a
+                      <AppLink
                         href={"/patient/appointment/" + a.id}
                         className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
                       >
                         View details →
-                      </a>
+                      </AppLink>
                     </div>
                   </div>
                 ))}
@@ -343,19 +340,19 @@ export function AppointmentTokens() {
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 shrink-0">
-            <a
+            <AppLink
               className="inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-soft transition hover:bg-primary-hover whitespace-nowrap"
               href="/patient/appointments?book=1"
             >
               Book appointment →
-            </a>
+            </AppLink>
             {recentOrCancelled.length > 0 && (
-              <a
+              <AppLink
                 className="text-sm font-medium text-primary hover:underline whitespace-nowrap"
                 href="/patient/appointments"
               >
                 View history
-              </a>
+              </AppLink>
             )}
           </div>
         </article>
@@ -367,12 +364,12 @@ export function AppointmentTokens() {
             <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Recent &amp; cancelled appointments
             </h3>
-            <a
+            <AppLink
               href="/patient/appointments"
               className="text-xs font-medium text-primary hover:underline"
             >
               View full appointment history →
-            </a>
+            </AppLink>
           </div>
           <div className="mt-2.5 divide-y divide-border">
             {recentOrCancelled.map((a) => (
@@ -389,12 +386,12 @@ export function AppointmentTokens() {
                 </div>
                 <div className="flex items-center gap-3">
                   <AppointmentStatusBadge status={a.status} />
-                  <a
+                  <AppLink
                     href={"/patient/appointment/" + a.id}
                     className="text-xs font-medium text-primary hover:underline whitespace-nowrap"
                   >
                     View details →
-                  </a>
+                  </AppLink>
                 </div>
               </div>
             ))}

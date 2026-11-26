@@ -5,7 +5,12 @@ import { seedClinicalCache } from "@/components/clinical";
 import { useAuth } from "./auth-provider";
 import type { ManagedClinic } from "@/types/local";
 export type ClinicOption = Pick<ManagedClinic, "id" | "name" | "city" | "area"> &
-  Partial<Pick<ManagedClinic, "address" | "phone" | "department" | "doctorName" | "openingTime" | "closingTime">> & {
+  Partial<
+    Pick<
+      ManagedClinic,
+      "address" | "phone" | "department" | "doctorName" | "openingTime" | "closingTime"
+    >
+  > & {
     active?: boolean;
   };
 let commandClinic = "northstar";

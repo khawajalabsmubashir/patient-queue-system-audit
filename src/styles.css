@@ -140,6 +140,7 @@
   html {
     overflow-x: clip;
     scrollbar-gutter: stable;
+    -webkit-text-size-adjust: 100%;
   }
   html:has(body[data-scroll-locked]),
   html.dialog-scroll-locked {
@@ -158,6 +159,16 @@
     color: var(--color-foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-x: none;
+  }
+  button,
+  a,
+  [role="button"],
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
   .tabular {
     font-variant-numeric: tabular-nums;
@@ -264,10 +275,23 @@
   }
 }
 
-
-.skip-link { position: fixed; left: 20px; top: 12px; z-index: 100; transform: translateY(-200%); background: var(--primary); color: var(--primary-foreground); padding: 12px 20px; border-radius: var(--radius); }
-.skip-link:focus { transform: none; }
-main { min-width: 0; }
+.skip-link {
+  position: fixed;
+  left: 20px;
+  top: 12px;
+  z-index: 100;
+  transform: translateY(-200%);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  padding: 12px 20px;
+  border-radius: var(--radius);
+}
+.skip-link:focus {
+  transform: none;
+}
+main {
+  min-width: 0;
+}
 
 .prescription-sheet {
   background: #fff;
@@ -362,6 +386,7 @@ main { min-width: 0; }
   scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: oklch(0.75 0.012 180) transparent;
+  -webkit-overflow-scrolling: touch;
 }
 .thin-scrollbar::-webkit-scrollbar {
   width: 6px;
