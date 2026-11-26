@@ -1,4 +1,4 @@
-import { giveUpToken } from "../services/appointment-tokens.ts";
+import { cancelPatientAppointment, giveUpToken } from "../services/appointment-tokens.ts";
 import { clinicRemoval } from "../services/clinics.ts";
 import { audit, authorizeClinic } from "../services/operations.ts";
 import {
@@ -86,6 +86,19 @@ export function queueRoutes(db: Database, notify: Notify) {
     notify("token:cancelled");
     res.json({ success: true, data });
   });
+  router.post("/patient/appointments/:id/cancel", requireRole(db, "patient"), async (req, res) => {
+    z.object({})
+      .strict()
+      .parse(req.body ?? {});
+    const data = await cancelPatientAppointment(
+      db,
+      res.locals["user"].id,
+      z.string().min(1).max(100).parse(req.params["id"]),
+    );
+    notify("token:cancelled");
+    notify("appointment:updated");
+    res.json({ success: true, data });
+  });
   router.get("/admin/clinics/summary", requireRole(db, "admin"), async (_req, res) =>
     res.json({ success: true, data: await allClinicsState(db) }),
   );
@@ -149,7 +162,12 @@ export function queueRoutes(db: Database, notify: Notify) {
   router.get("/admin/state", requireRole(db, "admin"), async (req, res) =>
     res.json({
       success: true,
-      data: await adminState(db, dateValue(req.query["historyDate"]), scope(req), dateValue(req.query["queueDate"])),
+      data: await adminState(
+        db,
+        dateValue(req.query["historyDate"]),
+        scope(req),
+        dateValue(req.query["queueDate"]),
+      ),
     }),
   );
   router.get("/admin/history", requireRole(db, "admin"), async (req, res) =>

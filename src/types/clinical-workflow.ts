@@ -13,11 +13,16 @@ export interface AppointmentContext {
   id: string;
   clinicId: string;
   clinicName: string;
+  department?: string;
   patientId: string;
+  patientName?: string;
+  dateOfBirth?: string | null;
   scheduledAt: string;
   status: string;
   reason: string;
   patientNotes: string;
+  visitId?: string | null;
+  prescriptionSummary?: string | null;
   attachments: AppointmentAttachment[];
 }
 export interface CatalogMedicine {

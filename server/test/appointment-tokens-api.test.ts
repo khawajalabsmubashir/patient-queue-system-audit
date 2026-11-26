@@ -185,6 +185,26 @@ test(
             .run(nextDay + "T12:00", second.appointmentId!),
       );
       assert.equal(
+        (await req("/patient/appointments/" + first.appointmentId + "/cancel", other.cookie, {}))
+          .status,
+        404,
+      );
+      assert.equal(
+        (await req("/patient/appointments/" + second.appointmentId + "/cancel", other.cookie, {}))
+          .status,
+        409,
+      );
+      assert.equal(
+        (await req("/patient/appointments/" + first.appointmentId + "/cancel", p.cookie, {}))
+          .status,
+        200,
+      );
+      assert.equal(
+        (await one<any>(app.db, "SELECT status FROM appointments WHERE id=?", first.appointmentId!))
+          .status,
+        "cancelled",
+      );
+      assert.equal(
         (await req("/patient/tokens/" + first.id + "/give-up", p.cookie, {})).status,
         200,
       );

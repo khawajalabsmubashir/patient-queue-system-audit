@@ -104,7 +104,17 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
     ...actual,
     useNavigate: () => mocks.navigate,
     useLocation: () => ({ pathname: mocks.pathname }),
-    Link: ({ to, children, className, onClick, onMouseEnter, onFocus, search: _search, activeProps: _activeProps, ...rest }: any) => (
+    Link: ({
+      to,
+      children,
+      className,
+      onClick,
+      onMouseEnter,
+      onFocus,
+      search: _search,
+      activeProps: _activeProps,
+      ...rest
+    }: any) => (
       <a
         {...rest}
         href={typeof to === "string" ? to : "#"}
@@ -123,11 +133,7 @@ vi.mock("@tanstack/react-router", async (importOriginal) => {
   };
 });
 
-import {
-  clearClinicalCache,
-  prefetchClinicalData,
-  useClinicalData,
-} from "@/components/clinical";
+import { clearClinicalCache, prefetchClinicalData, useClinicalData } from "@/components/clinical";
 import { AttachmentFields } from "@/components/appointment-files";
 import { Appointments } from "@/routes/patient.appointments";
 import { PatientConditions } from "@/components/patient-conditions";
@@ -147,7 +153,11 @@ import { Route as DashboardRoute } from "@/routes/patient.dashboard";
 import { Route as ProfileRoute } from "@/routes/patient.profile";
 import { BillingWorkspace } from "@/components/billing-workspace";
 import { SelectField } from "@/components/form-controls";
-import { validatePassword, validatePersonName, validatePhoneNumber } from "@/domain/input-validation";
+import {
+  validatePassword,
+  validatePersonName,
+  validatePhoneNumber,
+} from "@/domain/input-validation";
 import { formatDateOnly, formatDateTime } from "@/domain/date-format";
 
 afterEach(() => {
@@ -198,7 +208,12 @@ describe("Audit fixes verification", () => {
     cleanup();
     mocks.logout.mockReset();
     mocks.role = "nurse";
-    mocks.api.mockResolvedValue({ clinic: { name: "Clinic" }, queue: [], patients: [], appointments: [] });
+    mocks.api.mockResolvedValue({
+      clinic: { name: "Clinic" },
+      queue: [],
+      patients: [],
+      appointments: [],
+    });
     const StaffComponent = StaffRoute.options.component!;
     render(<StaffComponent />);
 
@@ -235,13 +250,15 @@ describe("Audit fixes verification", () => {
     cleanup();
 
     render(<Appointments />);
-    fireEvent.click(await screen.findByRole("button", { name: "Book appointment" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Book Appointment/i }));
     expect(screen.queryByLabelText(/Reason for appointment/i)).toBeNull();
 
-    const nameInput = screen.getByLabelText("Patient name") as HTMLInputElement;
+    const nameInput = (await screen.findByLabelText("Full Name *")) as HTMLInputElement;
     fireEvent.change(nameInput, { target: { value: "Ali'; DROP TABLE users;--" } });
-    fireEvent.click(screen.getByRole("button", { name: "Review booking" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent(/invalid characters|disallowed code/i);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm Booking" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /invalid characters|disallowed code/i,
+    );
   });
 
   it("Fix 4: Conditions dropdown reveals 'Other condition' input when 'Other' is selected", async () => {
@@ -509,7 +526,9 @@ describe("Audit fixes verification", () => {
     expect(validatePersonName("Ab", "Full name").ok).toBe(false);
     expect(validatePersonName("Ali", "Full name").ok).toBe(true);
     expect(validatePersonName("@#$%^&&^%$#", "Full name").ok).toBe(false);
-    expect(validatePersonName("@#$%^&&^%$#", "Full name", { strictAllowlist: false }).ok).toBe(false);
+    expect(validatePersonName("@#$%^&&^%$#", "Full name", { strictAllowlist: false }).ok).toBe(
+      false,
+    );
 
     render(<Register />);
     fireEvent.change(screen.getByLabelText("Full name"), {
@@ -556,7 +575,9 @@ describe("Audit fixes verification", () => {
     fireEvent.change(nameInput, { target: { value: "Valid Patient" } });
     fireEvent.change(screen.getByLabelText("Phone"), { target: { value: "03001234567" } });
     fireEvent.change(screen.getByLabelText("Password"), { target: { value: "StrongPass123!" } });
-    fireEvent.change(screen.getByLabelText("Confirm password"), { target: { value: "StrongPass123!" } });
+    fireEvent.change(screen.getByLabelText("Confirm password"), {
+      target: { value: "StrongPass123!" },
+    });
     fireEvent.click(screen.getByRole("button", { name: /Create account/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent("Email is required.");
     expect(mocks.register).not.toHaveBeenCalled();
@@ -564,7 +585,9 @@ describe("Audit fixes verification", () => {
 
   it("BUG-09: Network failure produces user-friendly connection message without local API text", async () => {
     const actualClient = await vi.importActual<typeof import("@/api/client")>("@/api/client");
-    const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const fetchSpy = vi
+      .spyOn(globalThis, "fetch")
+      .mockRejectedValueOnce(new TypeError("Failed to fetch"));
     try {
       await expect(actualClient.api("/auth/login", { method: "POST", body: {} })).rejects.toThrow(
         /Connection failed. Please check your internet connection and try again./i,
@@ -609,7 +632,9 @@ describe("Audit fixes verification", () => {
     // Submit form directly as triggered by pressing Enter inside password input
     const form = passwordInput.closest("form")!;
     fireEvent.submit(form);
-    expect(await screen.findByRole("alert")).toHaveTextContent("The email or password is incorrect.");
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "The email or password is incorrect.",
+    );
     expect(mocks.login).toHaveBeenCalledTimes(1);
 
     for (let i = 2; i <= 7; i++) {
@@ -663,9 +688,7 @@ describe("Audit fixes verification", () => {
           document: null,
           bills: { balance: 0 },
           followups: [],
-          notifications: [
-            { id: "n1", title: "Turn approaching", message: "Arrive soon" },
-          ],
+          notifications: [{ id: "n1", title: "Turn approaching", message: "Arrive soon" }],
         });
       }
       return Promise.resolve([]);
@@ -714,7 +737,7 @@ describe("Audit fixes verification", () => {
     });
 
     render(<Appointments />);
-    fireEvent.click(await screen.findByRole("button", { name: "Book appointment" }));
+    fireEvent.click(await screen.findByRole("button", { name: /Book Appointment/i }));
     const dialog = await screen.findByRole("dialog");
 
     // BUG-14: Uniform rounded-xl + overflow-hidden so scrollbars never square off corners
@@ -729,7 +752,7 @@ describe("Audit fixes verification", () => {
     fireEvent.keyDown(grid, { key: "Escape" });
 
     // BUG-15: Clicking outside on overlay does NOT close the modal; Cancel with unsaved notes asks confirmation
-    fireEvent.change(within(dialog).getByLabelText("Patient notes (optional)"), {
+    fireEvent.change(within(dialog).getByLabelText("Notes / Symptoms (Optional)"), {
       target: { value: "Follow-up MRI notes" },
     });
     const overlay = document.querySelector("[data-radix-dialog-overlay], .fixed.inset-0.z-50");
@@ -865,9 +888,23 @@ describe("Audit fixes verification", () => {
       }
       if (path.includes("/patient/summary")) {
         return Promise.resolve({
-          appointment: { id: "appt-next", clinic_id: "clinic", scheduled_at: "2030-11-19T10:45", clinic_name: "Health Point", status: "confirmed" },
-          visit: { clinic_id: "clinic", visit_at: "2026-11-16T09:00:00Z", clinic_name: "Health Point" },
-          prescription: { clinic_id: "clinic", prescribed_at: "2026-11-16T09:00:00Z", clinic_name: "Health Point" },
+          appointment: {
+            id: "appt-next",
+            clinic_id: "clinic",
+            scheduled_at: "2030-11-19T10:45",
+            clinic_name: "Health Point",
+            status: "confirmed",
+          },
+          visit: {
+            clinic_id: "clinic",
+            visit_at: "2026-11-16T09:00:00Z",
+            clinic_name: "Health Point",
+          },
+          prescription: {
+            clinic_id: "clinic",
+            prescribed_at: "2026-11-16T09:00:00Z",
+            clinic_name: "Health Point",
+          },
           document: null,
           bills: { balance: 25000, unpaid_count: 1 },
           followups: [
@@ -949,16 +986,21 @@ describe("Audit fixes verification", () => {
 
     // Small Follow-up message shows real follow-up guidance + Pending status
     const followupRegion = screen.getByRole("region", { name: "Follow-up message" });
-    expect(within(followupRegion).getByText(/Take proper rest and medicine on time./i)).toBeVisible();
+    expect(
+      within(followupRegion).getByText(/Take proper rest and medicine on time./i),
+    ).toBeVisible();
     expect(within(followupRegion).getByText("Pending")).toBeVisible();
 
     // History & My Visits shows date selector + Download PDF link without Consultation with Dr. subtitle
     const historySection = screen.getByRole("region", { name: "History and my visits" });
-    expect(within(historySection).getByRole("heading", { name: "History & My Visits" })).toBeVisible();
-    expect(await within(historySection).findByRole("link", { name: /Download Your Prescription \(PDF\)/i })).toHaveAttribute(
-      "href",
-      "/api/patient/visits/visit-1/prescription-pdf",
-    );
+    expect(
+      within(historySection).getByRole("heading", { name: "History & My Visits" }),
+    ).toBeVisible();
+    expect(
+      await within(historySection).findByRole("link", {
+        name: /Download Your Prescription \(PDF\)/i,
+      }),
+    ).toHaveAttribute("href", "/api/patient/visits/visit-1/prescription-pdf");
     expect(within(historySection).queryByText(/Consultation with Dr./i)).toBeNull();
     expect(within(historySection).queryByText(/Ayesha Mahmood/i)).toBeNull();
   });
@@ -1073,7 +1115,10 @@ describe("Audit fixes verification", () => {
     expect(screen.queryByRole("link", { name: /^Billing$/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /^Doctor Schedule$/i })).toBeNull();
     expect(screen.queryByRole("link", { name: /^Reports$/i })).toBeNull();
-    expect(screen.getByRole("link", { name: /^Analytics$/i })).toHaveAttribute("href", "/admin/analytics");
+    expect(screen.getByRole("link", { name: /^Analytics$/i })).toHaveAttribute(
+      "href",
+      "/admin/analytics",
+    );
 
     const mainEl = container.querySelector("main") as HTMLElement;
     expect(mainEl.className).toContain("min-w-0");
@@ -1122,7 +1167,7 @@ describe("Audit fixes verification", () => {
     expect(dialog.className).toContain("overflow-hidden");
     expect(document.documentElement.classList.contains("dialog-scroll-locked")).toBe(true);
 
-    const dialogBody = dialog.querySelector("[data-dialog-body=\"true\"]") as HTMLElement;
+    const dialogBody = dialog.querySelector('[data-dialog-body="true"]') as HTMLElement;
     expect(dialogBody).not.toBeNull();
     expect(dialogBody.className).toContain("overflow-y-auto");
     expect(dialogBody.className).toContain("thin-scrollbar");
@@ -1130,5 +1175,161 @@ describe("Audit fixes verification", () => {
     fireEvent.click(within(dialog).getByRole("button", { name: "Close" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(document.documentElement.classList.contains("dialog-scroll-locked")).toBe(false);
+  });
+
+  it("Issue 18: Book Appointment removes Gender & City dropdowns and lists all active clinics; View details opens Appointment Details Modal with cancel and prescription PDF", async () => {
+    mocks.api.mockImplementation((path: string, opts?: { method?: string }) => {
+      if (path.includes("/patient/profile")) {
+        return Promise.resolve({
+          id: "p1",
+          fullName: "Sara Tariq",
+          phone: "03008291045",
+          address: "12 Clifton",
+          dateOfBirth: "1992-05-12",
+          gender: "female",
+        });
+      }
+      if (path === "/patient/appointments") {
+        if (opts?.method === "POST") {
+          return Promise.resolve({ id: "apt-new", token: { id: "tok-new", tokenCode: "HP-012" } });
+        }
+        return Promise.resolve([
+          {
+            id: "apt-sched",
+            clinicId: "clinic",
+            clinicName: "Health Point",
+            patientId: "p1",
+            patientName: "Sara Tariq",
+            scheduledAt: "2026-11-30T10:15",
+            status: "scheduled",
+            reason: "",
+            token: { id: "t-sched", tokenCode: "BHC-004", status: "waiting" },
+          },
+          {
+            id: "apt-done",
+            clinicId: "clinic-2",
+            clinicName: "City Medical Wing",
+            patientId: "p1",
+            patientName: "Sara Tariq",
+            scheduledAt: "2026-10-15T11:00",
+            status: "completed",
+            reason: "",
+            token: { id: "t-done", tokenCode: "CMW-002", status: "completed" },
+          },
+        ]);
+      }
+      if (path === "/appointments/apt-sched/context") {
+        return Promise.resolve({
+          id: "apt-sched",
+          clinicId: "clinic",
+          clinicName: "Health Point",
+          department: "Neuro Spine Outpatient",
+          patientId: "p1",
+          patientName: "Sara Tariq",
+          dateOfBirth: "1992-05-12",
+          scheduledAt: "2026-11-30T10:15",
+          status: "scheduled",
+          reason: "",
+          patientNotes: "Mild lower back stiffness in the morning.",
+          token: { id: "t-sched", tokenCode: "BHC-004", status: "waiting" },
+          attachments: [
+            {
+              id: "att-1",
+              title: "Lumbar MRI",
+              type: "medical_document",
+              filename: "Lumbar_MRI_Report.pdf",
+              mime: "application/pdf",
+              size: 1024,
+              status: "ready",
+              createdAt: "2026-11-20T09:00:00Z",
+            },
+          ],
+        });
+      }
+      if (path === "/appointments/apt-done/context") {
+        return Promise.resolve({
+          id: "apt-done",
+          clinicId: "clinic-2",
+          clinicName: "City Medical Wing",
+          department: "Neurology",
+          patientId: "p1",
+          patientName: "Sara Tariq",
+          dateOfBirth: "1992-05-12",
+          scheduledAt: "2026-10-15T11:00",
+          status: "completed",
+          reason: "",
+          patientNotes: "",
+          visitId: "visit-1",
+          prescriptionSummary: "Tab. Mecobalamin 500mcg once daily for 30 days",
+          token: { id: "t-done", tokenCode: "CMW-002", status: "completed" },
+          attachments: [],
+        });
+      }
+      if (path === "/patient/appointments/apt-sched/cancel") {
+        return Promise.resolve({ id: "apt-sched", status: "cancelled" });
+      }
+      return Promise.resolve({});
+    });
+
+    render(<Appointments />);
+    expect(await screen.findByText(/BHC-004/)).toBeVisible();
+
+    // 1) Open Scheduled appointment details modal without redirecting
+    fireEvent.click(screen.getByText(/BHC-004/).closest("button")!);
+    const detailDialog = await screen.findByRole("dialog");
+    expect(detailDialog).toHaveTextContent("Health Point");
+    expect(detailDialog).toHaveTextContent("BHC-004");
+    expect(detailDialog).toHaveTextContent("Sara Tariq");
+    expect(detailDialog).toHaveTextContent("Neuro Spine Outpatient");
+    expect(await within(detailDialog).findByText("Lumbar_MRI_Report.pdf")).toBeVisible();
+    expect(detailDialog).toHaveTextContent("Mild lower back stiffness in the morning.");
+    expect(within(detailDialog).getByRole("button", { name: "Cancel Appointment" })).toBeVisible();
+
+    // Cancel flow via modal
+    fireEvent.click(within(detailDialog).getByRole("button", { name: "Cancel Appointment" }));
+    fireEvent.click(await within(detailDialog).findByRole("button", { name: "Yes, Cancel" }));
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith("/patient/appointments/apt-sched/cancel", {
+        method: "POST",
+        body: {},
+      }),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    // 2) Open Completed appointment details modal -> shows Visit Prescription & PDF download
+    fireEvent.click(screen.getByText(/CMW-002/).closest("button")!);
+    const doneDialog = await screen.findByRole("dialog");
+    expect(await within(doneDialog).findByText("Visit Prescription")).toBeVisible();
+    expect(doneDialog).toHaveTextContent("PDF Ready");
+    expect(doneDialog).toHaveTextContent("Tab. Mecobalamin 500mcg once daily for 30 days");
+    expect(
+      within(doneDialog).getByRole("link", { name: /Download Your Prescription/i }),
+    ).toHaveAttribute("href", "/api/patient/visits/visit-1/prescription-pdf");
+    expect(within(doneDialog).queryByRole("button", { name: "Cancel Appointment" })).toBeNull();
+    fireEvent.click(within(doneDialog).getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+    // 3) Book Appointment modal omits Gender & City, lists clinics in single select, submits directly
+    fireEvent.click(screen.getByRole("button", { name: /Book Appointment/i }));
+    const bookDialog = await screen.findByRole("dialog");
+    expect(within(bookDialog).queryByLabelText(/Gender/i)).toBeNull();
+    expect(within(bookDialog).queryByLabelText(/City/i)).toBeNull();
+    expect(within(bookDialog).getByLabelText("Select Clinic / Center")).toBeVisible();
+    expect(within(bookDialog).getByLabelText("Age (Years) *")).toHaveValue(34);
+    expect(within(bookDialog).queryByRole("button", { name: /Review booking/i })).toBeNull();
+    fireEvent.click(within(bookDialog).getByRole("button", { name: "Confirm Booking" }));
+    await waitFor(() =>
+      expect(mocks.api).toHaveBeenCalledWith(
+        "/patient/profile",
+        expect.objectContaining({
+          method: "PUT",
+          body: expect.objectContaining({
+            fullName: "Sara Tariq",
+            gender: "female",
+            dateOfBirth: "1992-05-12",
+          }),
+        }),
+      ),
+    );
   });
 });

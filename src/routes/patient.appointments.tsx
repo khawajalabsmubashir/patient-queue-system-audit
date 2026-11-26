@@ -1,131 +1,317 @@
-import { PatientDemographics } from "@/components/patient-demographics";
+import { useEffect, useId, useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { ChevronRight, Download, FileText, Plus } from "lucide-react";
 import {
   AttachmentFields,
   uploadAppointmentFiles,
   type SelectedAttachment,
 } from "@/components/appointment-files";
-import type { PatientProfile } from "@/types/clinical";
-import { AppointmentStatusBadge, TokenActions } from "@/components/appointment-tokens";
-import { ClinicLocationPicker } from "@/components/clinic-location-picker";
-import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, Btn } from "@/components/qc";
-import { useState } from "react";
-import { formatDateOnly, formatDateTime, sortPatientAppointments } from "@/domain/date-format";
 import { AppointmentSlotPicker } from "@/components/appointment-slot-picker";
-import { useClinicContext } from "@/providers/clinic-provider";
-import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { AppointmentStatusBadge, TokenActions } from "@/components/appointment-tokens";
+import { ClinicalLoading, useClinicalData } from "@/components/clinical";
+import { SelectField } from "@/components/form-controls";
+import { Btn, Field, PageHeader } from "@/components/qc";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { api } from "@/api/client";
+import { formatDateOnly, formatDateTime, sortPatientAppointments } from "@/domain/date-format";
+import {
+  MAX_FULL_NAME_LENGTH,
+  MIN_FULL_NAME_LENGTH,
+  validatePersonName,
+} from "@/domain/input-validation";
+import { ageOnDate, validBirthDate } from "@/domain/patient-demographics";
+import { usePatientToday } from "@/hooks/use-patient-today";
+import { useClinicContext } from "@/providers/clinic-provider";
 import { friendlyError } from "@/services/errors";
-import { validatePersonName } from "@/domain/input-validation";
-import { useClinicalData, ClinicalLoading } from "@/components/clinical";
+import type { PatientProfile } from "@/types/clinical";
+import type { AppointmentContext } from "@/types/clinical-workflow";
 import type { Appointment } from "@/types/local";
+
 export const Route = createFileRoute("/patient/appointments")({ component: Appointments });
+
 export function Appointments() {
+  const clinicSelectId = useId();
+  const today = usePatientToday();
   const patient = useClinicalData<PatientProfile>("/patient/profile");
-  const [files, setFiles] = useState<SelectedAttachment[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const progress = (key: string, state: string, error = "") =>
-    setFiles((previous) => previous.map((f) => (f.key === key ? { ...f, state, error } : f)));
   const remote = useClinicalData<Appointment[]>("/patient/appointments");
   const { clinics, selected } = useClinicContext();
+
+  const activeClinics = clinics.filter((c) => c.active !== false);
+
   const [booking, setBooking] = useState(
     () =>
       typeof window !== "undefined" &&
       new URLSearchParams(window.location.search).get("book") === "1",
   );
   const [clinicId, setClinicId] = useState(selected === "all" ? "" : selected);
-  const [notes, setNotes] = useState(""),
-    [review, setReview] = useState<{
-      fullName: string;
-      scheduledAt: string;
-      dateOfBirth: string;
-      gender: string;
-    } | null>(null);
+  const [fullName, setFullName] = useState("");
+  const [dob, setDob] = useState("");
+  const [ageValue, setAgeValue] = useState("");
+  const [notes, setNotes] = useState("");
+  const [files, setFiles] = useState<SelectedAttachment[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+
+  const [statusFilter, setStatusFilter] = useState<"all" | "scheduled" | "completed" | "cancelled">(
+    "all",
+  );
   const [confirmed, setConfirmed] = useState<{
     id: string;
+    clinicName: string;
     token: { id: string; tokenCode: string; status: string };
     scheduledAt: string;
   } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "upcoming" | "completed" | "cancelled">("all");
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const [refresh, setRefresh] = useState(0);
-  const hasUnsavedBooking = Boolean(review || notes.trim() || files.length > 0);
-  const sortedAppointments = sortPatientAppointments(remote.data ?? []);
+
+  // Appointment Details Modal state
+  const [detailAppointment, setDetailAppointment] = useState<Appointment | null>(null);
+  const [detailContext, setDetailContext] = useState<AppointmentContext | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState("");
+  const [detailAttempt, setDetailAttempt] = useState(0);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelBusy, setCancelBusy] = useState(false);
+  const [downloadError, setDownloadError] = useState("");
+
+  const effectiveClinicId =
+    clinicId && activeClinics.some((c) => c.id === clinicId)
+      ? clinicId
+      : selected !== "all" && activeClinics.some((c) => c.id === selected)
+        ? selected
+        : (activeClinics[0]?.id ?? "");
+
+  const progress = (key: string, state: string, fileErr = "") =>
+    setFiles((previous) =>
+      previous.map((f) => (f.key === key ? { ...f, state, error: fileErr } : f)),
+    );
+
+  // Hydrate patient fields whenever booking modal opens or patient profile finishes loading
+  useEffect(() => {
+    if (!booking || !patient.data) return;
+    setFullName((prev) => prev || patient.data!.fullName || "");
+    const initialDob = patient.data.dateOfBirth ?? "";
+    setDob((prev) => {
+      if (prev) return prev;
+      const calc = ageOnDate(initialDob, today);
+      if (calc !== null) setAgeValue((a) => a || String(calc));
+      return initialDob;
+    });
+  }, [booking, patient.data, today]);
+
+  // Load full context when Appointment Details Modal opens
+  useEffect(() => {
+    if (!detailAppointment) {
+      setDetailContext(null);
+      setDetailError("");
+      setDetailLoading(false);
+      setConfirmCancel(false);
+      setDownloadError("");
+      return;
+    }
+    let cancelled = false;
+    setDetailLoading(true);
+    setDetailError("");
+    void api<AppointmentContext>(
+      `/appointments/${encodeURIComponent(detailAppointment.id)}/context`,
+    )
+      .then((ctx) => {
+        if (!cancelled) setDetailContext(ctx);
+      })
+      .catch((e) => {
+        if (!cancelled) setDetailError(friendlyError(e));
+      })
+      .finally(() => {
+        if (!cancelled) setDetailLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [detailAppointment, detailAttempt]);
+
+  const openBookingModal = () => {
+    const p = patient.data;
+    const initialDob = p?.dateOfBirth ?? "";
+    const calcAge = ageOnDate(initialDob, today);
+    setFullName(p?.fullName ?? "");
+    setDob(initialDob);
+    setAgeValue(calcAge !== null ? String(calcAge) : "");
+    setClinicId(effectiveClinicId);
+    setNotes("");
+    setFiles([]);
+    setError("");
+    setConfirmDiscard(false);
+    setConfirmed(null);
+    setStatusMessage("");
+    setBooking(true);
+  };
+
+  const resetAndCloseBooking = () => {
+    setConfirmDiscard(false);
+    setNotes("");
+    setFiles([]);
+    setError("");
+    setFullName("");
+    setDob("");
+    setAgeValue("");
+    setBooking(false);
+  };
+
+  const hasUnsavedBooking = Boolean(
+    notes.trim() ||
+    files.length > 0 ||
+    (patient.data &&
+      ((fullName.trim() && fullName.trim() !== patient.data.fullName.trim()) ||
+        (dob && dob !== (patient.data.dateOfBirth ?? "")))),
+  );
+
+  const sortedAppointments = sortPatientAppointments(remote.data ?? [], today);
   const filteredAppointments = sortedAppointments.filter((a) => {
-    if (statusFilter === "upcoming")
+    if (statusFilter === "scheduled")
       return !["cancelled", "completed", "no_show"].includes(a.status);
     if (statusFilter === "completed") return a.status === "completed";
     if (statusFilter === "cancelled") return a.status === "cancelled" || a.status === "no_show";
     return true;
   });
+
+  const detailStatus = detailContext?.status ?? detailAppointment?.status ?? "scheduled";
+  const detailClinicName = detailContext?.clinicName ?? detailAppointment?.clinicName ?? "";
+  const detailClinicId = detailContext?.clinicId ?? detailAppointment?.clinicId ?? "";
+  const detailDepartment =
+    detailContext?.department ||
+    clinics.find((c) => c.id === detailClinicId)?.department ||
+    "Outpatient";
+  const detailTokenCode =
+    detailContext?.token?.tokenCode ?? detailAppointment?.token?.tokenCode ?? "";
+  const detailTokenStatus = detailContext?.token?.status ?? detailAppointment?.token?.status ?? "";
+  const detailPatientName =
+    detailContext?.patientName ||
+    detailAppointment?.patientName ||
+    patient.data?.fullName ||
+    "Patient";
+  const detailDob = detailContext?.dateOfBirth ?? patient.data?.dateOfBirth ?? null;
+  const detailAge = ageOnDate(detailDob, today);
+  const detailScheduledAt = detailContext?.scheduledAt ?? detailAppointment?.scheduledAt ?? "";
+  const detailNotes =
+    detailContext?.patientNotes || detailContext?.reason || detailAppointment?.reason || "";
+  const canCancelDetail =
+    Boolean(detailAppointment) &&
+    !["cancelled", "completed", "no_show"].includes(detailStatus) &&
+    !["serving", "completed"].includes(detailTokenStatus);
+
+  const handleCancelDetailAppointment = async () => {
+    if (!detailAppointment) return;
+    setCancelBusy(true);
+    setDetailError("");
+    try {
+      await api(`/patient/appointments/${encodeURIComponent(detailAppointment.id)}/cancel`, {
+        method: "POST",
+        body: {},
+      });
+      setDetailAppointment(null);
+      setConfirmCancel(false);
+      setStatusMessage("Appointment cancelled.");
+      remote.reload();
+      window.dispatchEvent(new Event("queuecare:refresh"));
+      window.dispatchEvent(new Event("queuecare:updated"));
+    } catch (e) {
+      setDetailError(friendlyError(e));
+    } finally {
+      setCancelBusy(false);
+    }
+  };
+
   return (
-    <>
-      <PageHeader title="My appointments" sub="Appointments across your clinics." />
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <Btn
-          onClick={() => {
-            setBooking(true);
-            setError("");
-            setReview(null);
-            setNotes("");
-            setFiles([]);
-            setConfirmed(null);
-            setConfirmDiscard(false);
-          }}
+    <div className="mx-auto max-w-4xl space-y-6">
+      <PageHeader
+        title="Your Appointments"
+        sub="Tap any appointment to view full details or book a new visit."
+        right={
+          <Btn onClick={openBookingModal} className="w-full font-semibold sm:w-auto">
+            <Plus className="size-4" aria-hidden="true" />
+            <span>+ Book Appointment</span>
+          </Btn>
+        }
+      />
+
+      {statusMessage && (
+        <div
+          role="status"
+          className="rounded-xl border border-primary/25 bg-primary-soft px-4 py-3 text-sm font-medium text-primary"
         >
-          Book appointment
-        </Btn>
-        {remote.data && remote.data.length > 0 && (
-          <div
-            role="tablist"
-            aria-label="Filter appointments by status"
-            className="inline-flex flex-wrap items-center gap-1 rounded-lg border border-border bg-card p-1"
+          {statusMessage}
+        </div>
+      )}
+
+      <div
+        role="tablist"
+        aria-label="Filter appointments by status"
+        className="flex items-center gap-2 overflow-x-auto pb-1"
+      >
+        {(
+          [
+            ["all", "All"],
+            ["scheduled", "Scheduled"],
+            ["completed", "Completed"],
+            ["cancelled", "Cancelled"],
+          ] as const
+        ).map(([key, label]) => (
+          <button
+            key={key}
+            type="button"
+            role="tab"
+            aria-selected={statusFilter === key}
+            onClick={() => setStatusFilter(key)}
+            className={`shrink-0 rounded-xl border px-4 py-2 text-sm font-semibold transition-colors ${
+              statusFilter === key
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border bg-card text-foreground hover:bg-muted"
+            }`}
           >
-            {(
-              [
-                ["all", "All"],
-                ["upcoming", "Upcoming"],
-                ["completed", "Completed"],
-                ["cancelled", "Cancelled"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                role="tab"
-                aria-selected={statusFilter === key}
-                onClick={() => setStatusFilter(key)}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition ${
-                  statusFilter === key
-                    ? "bg-primary-soft text-primary font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
+            {label}
+          </button>
+        ))}
       </div>
+
       {confirmed && (
-        <section className="surface mb-5 p-6" role="status">
-          <h2 className="font-semibold">Appointment confirmed</h2>
-          <p className="tabular-nums mt-2 text-sm">{formatDateTime(confirmed.scheduledAt)}</p>
-          <p className="tabular mt-3 text-4xl font-semibold text-primary">
-            {confirmed.token.tokenCode}
-          </p>
-          <a
-            className="mt-4 inline-block text-primary hover:underline"
-            href={"/patient/appointment/" + confirmed.id}
-          >
-            View appointment →
-          </a>
+        <section className="surface p-6" role="status">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Appointment confirmed</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {confirmed.clinicName} ·{" "}
+                <span className="tabular-nums">{formatDateTime(confirmed.scheduledAt)}</span>
+              </p>
+              <p className="tabular mt-3 text-4xl font-bold text-primary">
+                {confirmed.token.tokenCode}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                setDetailAppointment({
+                  id: confirmed.id,
+                  clinicId: effectiveClinicId,
+                  clinicName: confirmed.clinicName,
+                  patientId: patient.data?.id ?? "",
+                  patientName: patient.data?.fullName ?? "",
+                  scheduledAt: confirmed.scheduledAt,
+                  status: "scheduled",
+                  reason: "",
+                  token: confirmed.token,
+                })
+              }
+              className="text-sm font-semibold text-primary hover:underline"
+            >
+              View details →
+            </button>
+          </div>
           <TokenActions token={confirmed.token} onChanged={remote.reload} />
           {files.length > 0 && (
             <div className="mt-4 space-y-3">
-              <p role="status">
+              <p role="status" className="text-sm">
                 {files.every((f) => f.state === "Uploaded")
                   ? "All supporting documents uploaded privately."
                   : "Your appointment is confirmed. Retry any unfinished supporting documents below; do not book again."}
@@ -147,33 +333,43 @@ export function Appointments() {
           )}
         </section>
       )}
+
       {!remote.data ? (
         <ClinicalLoading error={remote.error} retry={remote.reload} />
       ) : (
-        <div className="surface divide-y divide-border">
+        <div className="surface divide-y divide-border overflow-hidden">
           {filteredAppointments.map((a) => (
-            <article key={a.id} className="p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-medium">{a.clinicName}</h2>
-                <AppointmentStatusBadge status={a.status} />
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => setDetailAppointment(a)}
+              className="flex w-full cursor-pointer flex-col gap-3 p-4 text-left transition-colors hover:bg-muted/40 sm:flex-row sm:items-center sm:justify-between sm:p-6"
+            >
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-base font-bold text-foreground sm:text-lg">
+                    {a.clinicName}
+                  </span>
+                  <AppointmentStatusBadge status={a.status} />
+                  {a.status === "completed" && (
+                    <span className="rounded-full border border-primary/25 bg-primary-soft px-2.5 py-0.5 text-xs font-semibold text-primary">
+                      Prescription
+                    </span>
+                  )}
+                </div>
+                <p className="tabular-nums mt-1 text-sm text-muted-foreground">
+                  {formatDateTime(a.scheduledAt)}
+                  {a.token ? ` · Token ${a.token.tokenCode}` : ""}
+                </p>
               </div>
-              <p className="tabular-nums mt-1 text-sm text-muted-foreground">
-                {formatDateTime(a.scheduledAt)}
-              </p>
-              {a.reason && <p className="mt-1 text-sm">{a.reason}</p>}
-              {a.token && (
-                <p className="mt-2 text-sm font-semibold text-primary">Token {a.token.tokenCode}</p>
-              )}
-              <a
-                className="mt-3 inline-block text-sm underline"
-                href={`/patient/appointment/${a.id}`}
-              >
-                View appointment details
-              </a>
-            </article>
+              <div className="flex shrink-0 items-center gap-1.5 text-sm font-semibold text-primary">
+                <span>View details</span>
+                <ChevronRight className="size-4" aria-hidden="true" />
+              </div>
+            </button>
           ))}
           {!filteredAppointments.length && (
-            <p className="p-6 text-sm text-muted-foreground">
+            <p className="p-8 text-center text-sm text-muted-foreground">
               {remote.data.length
                 ? "No appointments match this status filter."
                 : "No appointments scheduled."}
@@ -181,6 +377,222 @@ export function Appointments() {
           )}
         </div>
       )}
+
+      {/* MODAL 1: APPOINTMENT DETAILS MODAL */}
+      <Dialog
+        open={Boolean(detailAppointment)}
+        onOpenChange={(open) => {
+          if (cancelBusy) return;
+          if (!open) setDetailAppointment(null);
+        }}
+      >
+        <DialogContent className="max-h-[90dvh] max-w-md rounded-xl overflow-hidden">
+          <div className="pr-8">
+            <AppointmentStatusBadge status={detailStatus} />
+            <DialogTitle className="mt-2.5 text-xl font-bold text-foreground">
+              {detailClinicName || "Appointment Details"}
+            </DialogTitle>
+            <DialogDescription className="sr-only">
+              Full appointment details, attached documents, and visit prescription.
+            </DialogDescription>
+          </div>
+
+          <div className="space-y-2.5 rounded-xl border border-border bg-muted/40 p-4 text-sm">
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Token Number</span>
+              <span className="tabular font-bold text-foreground">
+                {detailTokenCode || "Not assigned"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Patient Name</span>
+              <span className="text-right font-semibold text-foreground">{detailPatientName}</span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Age / DOB</span>
+              <span className="text-right font-semibold text-foreground">
+                {detailDob
+                  ? `${detailAge !== null ? `${detailAge} yrs ` : ""}(${formatDateOnly(detailDob)})`
+                  : "Not provided"}
+              </span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Date &amp; Time</span>
+              <span className="tabular-nums text-right font-semibold text-foreground">
+                {formatDateTime(detailScheduledAt)}
+              </span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Department</span>
+              <span className="text-right font-semibold text-foreground">{detailDepartment}</span>
+            </div>
+            <div className="flex items-start justify-between gap-2">
+              <span className="shrink-0 text-muted-foreground">Attached Document</span>
+              <div className="min-w-0 text-right">
+                {detailLoading && !detailContext ? (
+                  <span className="text-xs text-muted-foreground">Loading…</span>
+                ) : detailContext?.attachments?.length ? (
+                  <div className="space-y-1">
+                    {detailContext.attachments.map((file) =>
+                      file.status === "ready" ? (
+                        <button
+                          key={file.id}
+                          type="button"
+                          onClick={() => {
+                            setDownloadError("");
+                            void api<{ url: string }>(
+                              `/appointment-attachments/${file.id}/download`,
+                            )
+                              .then((d) => {
+                                const a = document.createElement("a");
+                                a.href = d.url;
+                                a.target = "_blank";
+                                a.rel = "noopener noreferrer";
+                                a.click();
+                              })
+                              .catch((err) => setDownloadError(friendlyError(err)));
+                          }}
+                          className="block max-w-[200px] truncate text-right font-semibold text-primary hover:underline"
+                          title={`Download ${file.filename}`}
+                        >
+                          {file.filename}
+                        </button>
+                      ) : (
+                        <span
+                          key={file.id}
+                          className="block max-w-[200px] truncate font-medium text-muted-foreground"
+                        >
+                          {file.filename} ({file.status})
+                        </span>
+                      ),
+                    )}
+                  </div>
+                ) : (
+                  <span className="font-medium text-muted-foreground">None attached</span>
+                )}
+              </div>
+            </div>
+            <div className="border-t border-border pt-2.5">
+              <span className="mb-1.5 block text-xs text-muted-foreground">
+                Patient Notes / Symptoms
+              </span>
+              <p className="whitespace-pre-wrap break-words rounded-lg border border-border bg-card p-2.5 text-xs text-foreground sm:text-sm">
+                {detailNotes || "No additional notes provided."}
+              </p>
+            </div>
+          </div>
+
+          {downloadError && (
+            <p role="alert" className="text-xs text-destructive">
+              {downloadError}
+            </p>
+          )}
+
+          {detailError && (
+            <div
+              role="alert"
+              className="flex items-center justify-between gap-2 text-xs text-destructive"
+            >
+              <span>{detailError}</span>
+              <button
+                type="button"
+                onClick={() => setDetailAttempt((n) => n + 1)}
+                className="font-semibold underline"
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {detailStatus === "completed" && (
+            <div className="space-y-2.5 rounded-xl border border-primary/25 bg-primary-soft p-4">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                  Visit Prescription
+                </span>
+                <span className="text-xs font-semibold text-primary">PDF Ready</span>
+              </div>
+              <p className="text-xs text-foreground sm:text-sm">
+                {detailLoading && !detailContext
+                  ? "Loading prescription summary…"
+                  : detailContext?.prescriptionSummary ||
+                    "Consultation completed. Prescription ready to download."}
+              </p>
+              {detailContext?.visitId ? (
+                <a
+                  download
+                  href={`/api/patient/visits/${encodeURIComponent(detailContext.visitId)}/prescription-pdf`}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary-hover sm:text-sm"
+                >
+                  <Download className="size-4" aria-hidden="true" />
+                  <span>Download Your Prescription (PDF)</span>
+                </a>
+              ) : !detailLoading ? (
+                <Link
+                  to="/patient/visits"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary-hover sm:text-sm"
+                >
+                  <FileText className="size-4" aria-hidden="true" />
+                  <span>View Visit Prescriptions</span>
+                </Link>
+              ) : null}
+            </div>
+          )}
+
+          {confirmCancel && (
+            <div
+              role="alert"
+              className="space-y-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-sm"
+            >
+              <p className="font-semibold text-foreground">
+                Cancel this appointment and release your token?
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Btn
+                  type="button"
+                  variant="secondary"
+                  disabled={cancelBusy}
+                  onClick={() => setConfirmCancel(false)}
+                  className="flex-1"
+                >
+                  Keep appointment
+                </Btn>
+                <Btn
+                  type="button"
+                  disabled={cancelBusy}
+                  onClick={() => void handleCancelDetailAppointment()}
+                  className="flex-1 bg-destructive text-destructive-foreground hover:opacity-90"
+                >
+                  {cancelBusy ? "Cancelling…" : "Yes, Cancel"}
+                </Btn>
+              </div>
+            </div>
+          )}
+
+          <div className="flex flex-col gap-2.5 pt-1 sm:flex-row">
+            {canCancelDetail && !confirmCancel && (
+              <button
+                type="button"
+                disabled={cancelBusy}
+                onClick={() => setConfirmCancel(true)}
+                className="flex-1 rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm font-semibold text-destructive transition hover:bg-destructive/15 disabled:opacity-50"
+              >
+                Cancel Appointment
+              </button>
+            )}
+            <Btn
+              type="button"
+              onClick={() => setDetailAppointment(null)}
+              disabled={cancelBusy}
+              className="flex-1 rounded-xl py-3 font-semibold"
+            >
+              Done
+            </Btn>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* MODAL 2: BOOK APPOINTMENT MODAL */}
       <Dialog
         open={booking}
         onOpenChange={(open) => {
@@ -189,12 +601,12 @@ export function Appointments() {
             setConfirmDiscard(true);
             return;
           }
-          setConfirmDiscard(false);
-          setBooking(open);
+          if (!open) resetAndCloseBooking();
+          else setBooking(true);
         }}
       >
         <DialogContent
-          className="max-h-[90dvh] rounded-xl"
+          className="max-h-[90dvh] rounded-xl overflow-hidden"
           onPointerDownOutside={(e) => e.preventDefault()}
           onInteractOutside={(e) => e.preventDefault()}
           onEscapeKeyDown={(e) => {
@@ -208,65 +620,59 @@ export function Appointments() {
             }
           }}
         >
-          <DialogTitle>Book appointment</DialogTitle>
-          <DialogDescription>Choose a clinic, date and available time.</DialogDescription>
+          <div className="border-b border-border pb-3 pr-8">
+            <DialogTitle className="text-xl font-bold">Book Appointment</DialogTitle>
+            <DialogDescription className="mt-0.5 text-xs sm:text-sm">
+              Fill in your details below to get your token automatically.
+            </DialogDescription>
+          </div>
+
           {confirmDiscard && (
             <div
               role="alert"
               className="rounded-lg border border-warning/40 bg-warning-soft/50 p-3 text-sm"
             >
-              <p className="font-medium text-foreground">
-                Discard unsaved appointment details?
-              </p>
+              <p className="font-medium text-foreground">Discard unsaved appointment details?</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Your entered notes, attachments, or review selection will be lost.
+                Your entered notes, attachments, or changes will be lost.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
-                <Btn
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setConfirmDiscard(false)}
-                >
+                <Btn type="button" variant="secondary" onClick={() => setConfirmDiscard(false)}>
                   Keep editing
                 </Btn>
-                <Btn
-                  type="button"
-                  variant="danger"
-                  onClick={() => {
-                    setConfirmDiscard(false);
-                    setReview(null);
-                    setNotes("");
-                    setFiles([]);
-                    setError("");
-                    setBooking(false);
-                  }}
-                >
+                <Btn type="button" variant="danger" onClick={resetAndCloseBooking}>
                   Discard &amp; close
                 </Btn>
               </div>
             </div>
           )}
+
           <form
             className="space-y-4"
             onSubmit={(e) => {
               e.preventDefault();
               const f = new FormData(e.currentTarget);
-              if (!review) {
-                const nameCheck = validatePersonName(
-                  String(f.get("fullName") ?? ""),
-                  "Patient name",
-                );
-                if (!nameCheck.ok) {
-                  setError(nameCheck.error);
-                  return;
-                }
-                setError("");
-                setReview({
-                  fullName: nameCheck.value,
-                  scheduledAt: String(f.get("scheduledAt") ?? ""),
-                  dateOfBirth: String(f.get("dateOfBirth") ?? ""),
-                  gender: String(f.get("gender") ?? ""),
-                });
+              const nameCheck = validatePersonName(
+                fullName || String(f.get("fullName") ?? ""),
+                "Full name",
+              );
+              if (!nameCheck.ok) {
+                setError(nameCheck.error);
+                return;
+              }
+              const submittedDob = dob || String(f.get("dateOfBirth") ?? "");
+              if (!submittedDob || !validBirthDate(submittedDob, today)) {
+                setError("Please enter a valid date of birth.");
+                return;
+              }
+              const scheduledAt = String(f.get("scheduledAt") ?? "");
+              if (!scheduledAt) {
+                setError("Please select an appointment time.");
+                return;
+              }
+              const selectedClinicId = effectiveClinicId || String(f.get("clinicId") ?? "");
+              if (!selectedClinicId) {
+                setError("Please select a clinic.");
                 return;
               }
               setBusy(true);
@@ -277,11 +683,10 @@ export function Appointments() {
                 await api("/patient/profile", {
                   method: "PUT",
                   body: {
-                    fullName: review.fullName,
+                    fullName: nameCheck.value,
                     phone: patient.data.phone,
-                    address: patient.data.address,
-                    dateOfBirth: review.dateOfBirth,
-                    gender: review.gender,
+                    dateOfBirth: submittedDob,
+                    gender: patient.data.gender || "",
                   },
                 });
                 const booked = await api<{ id: string; token: { id: string; tokenCode: string } }>(
@@ -289,17 +694,22 @@ export function Appointments() {
                   {
                     method: "POST",
                     body: {
-                      clinicId,
-                      scheduledAt: review.scheduledAt,
+                      clinicId: selectedClinicId,
+                      scheduledAt,
                       reason: "",
                       patientNotes: notes,
                     },
                   },
                 );
+                const clinicName =
+                  activeClinics.find((c) => c.id === selectedClinicId)?.name ??
+                  clinics.find((c) => c.id === selectedClinicId)?.name ??
+                  "Clinic";
                 setConfirmed({
                   ...booked,
+                  clinicName,
                   token: { ...booked.token, status: "waiting" },
-                  scheduledAt: review.scheduledAt,
+                  scheduledAt,
                 });
                 if (files.length) {
                   await uploadAppointmentFiles(booked.id, files, progress);
@@ -307,90 +717,144 @@ export function Appointments() {
                 patient.reload();
                 remote.reload();
                 window.dispatchEvent(new Event("queuecare:refresh"));
+                window.dispatchEvent(new Event("queuecare:updated"));
                 setBooking(false);
+                setConfirmDiscard(false);
               })()
-                .catch((e) => {
-                  setError(friendlyError(e));
-                  setReview(null);
+                .catch((err) => {
+                  setError(friendlyError(err));
                   setRefresh((n) => n + 1);
                 })
                 .finally(() => setBusy(false));
             }}
           >
-            <div hidden={!!review} className="space-y-4">
-              {patient.data ? (
-                <PatientDemographics key={patient.data.id} patient={patient.data} required />
-              ) : (
-                <ClinicalLoading error={patient.error} retry={patient.reload} />
-              )}
-              <ClinicLocationPicker
-                value={clinicId}
-                onChange={(v) => {
-                  setClinicId(v);
-                  setError("");
-                }}
-              />
-              {clinicId && <AppointmentSlotPicker clinicId={clinicId} refresh={refresh} />}
-              <label className="mt-4 block text-sm">
-                Patient notes (optional)
-                <textarea
-                  aria-label="Patient notes (optional)"
-                  maxLength={2000}
-                  rows={3}
-                  className="mt-2 w-full rounded-lg border border-input p-3"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
+            {!patient.data ? (
+              <ClinicalLoading error={patient.error} retry={patient.reload} />
+            ) : (
+              <>
+                <Field
+                  label="Full Name *"
+                  name="fullName"
+                  required
+                  minLength={MIN_FULL_NAME_LENGTH}
+                  maxLength={MAX_FULL_NAME_LENGTH}
+                  autoComplete="name"
+                  placeholder="Enter patient full name"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
                 />
-              </label>
-            </div>
-            <AttachmentFields files={files} onChange={setFiles} disabled={busy} />
-            {review && (
-              <section className="space-y-3 rounded-lg border p-4">
-                <h2>Review your appointment</h2>
-                <p className="break-words [overflow-wrap:anywhere] font-medium">Patient: {review.fullName}</p>
-                <p>
-                  {clinics.find((c) => c.id === clinicId)?.name} ·{" "}
-                  {formatDateTime(review.scheduledAt)}
-                </p>
-                <p>
-                  Gender: {review.gender.replaceAll("_", " ")} · Date of birth:{" "}
-                  {formatDateOnly(review.dateOfBirth)}
-                </p>
-                {notes && <p className="whitespace-pre-wrap break-words">{notes}</p>}
-                <Btn
-                  type="button"
-                  variant="ghost"
-                  disabled={busy}
-                  onClick={() => setReview(null)}
-                >
-                  Back to edit
-                </Btn>
-              </section>
+
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <Field
+                    label="Date of Birth *"
+                    name="dateOfBirth"
+                    type="date"
+                    required
+                    max={today}
+                    value={dob}
+                    onChange={(e) => {
+                      const nextDob = e.target.value;
+                      setDob(nextDob);
+                      const calc = ageOnDate(nextDob, today);
+                      setAgeValue(calc !== null ? String(calc) : "");
+                    }}
+                  />
+                  <Field
+                    label="Age (Years) *"
+                    name="age"
+                    type="number"
+                    min={0}
+                    max={120}
+                    placeholder="e.g. 34"
+                    required
+                    value={ageValue}
+                    onChange={(e) => setAgeValue(e.target.value)}
+                  />
+                </div>
+
+                <div className="block">
+                  <label htmlFor={clinicSelectId} className="mb-1.5 block text-sm font-medium">
+                    Select Clinic / Center *
+                  </label>
+                  <SelectField
+                    id={clinicSelectId}
+                    name="clinicId"
+                    aria-label="Select Clinic / Center"
+                    required
+                    className="h-11 w-full rounded-lg border border-input bg-card px-3 text-sm"
+                    value={effectiveClinicId}
+                    onChange={(e) => {
+                      setClinicId(e.target.value);
+                      setError("");
+                    }}
+                  >
+                    {!activeClinics.length && <option value="">No clinics available</option>}
+                    {activeClinics.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+
+                {effectiveClinicId && (
+                  <AppointmentSlotPicker
+                    clinicId={effectiveClinicId}
+                    refresh={refresh}
+                    variant="portal"
+                  />
+                )}
+
+                <AttachmentFields files={files} onChange={setFiles} disabled={busy} />
+
+                <label className="block">
+                  <span className="mb-1.5 block text-sm font-medium">
+                    Notes / Symptoms{" "}
+                    <span className="font-normal text-muted-foreground">(Optional)</span>
+                  </span>
+                  <textarea
+                    aria-label="Notes / Symptoms (Optional)"
+                    maxLength={2000}
+                    rows={2}
+                    placeholder="Write any symptoms, pain area, or note for the doctor..."
+                    className="w-full rounded-lg border border-input bg-card p-3 text-sm outline-none transition placeholder:text-muted-foreground/70 focus:border-primary focus:ring-4 focus:ring-primary/10"
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                  />
+                </label>
+              </>
             )}
+
             {error && (
               <p role="alert" className="text-sm text-destructive">
                 {error}
               </p>
             )}
-            <div className="flex flex-wrap items-center gap-2 pt-1">
-              <Btn disabled={busy || !clinicId || !patient.data}>
-                {busy ? "Booking…" : review ? "Confirm booking" : "Review booking"}
-              </Btn>
+
+            <div className="flex gap-2.5 pt-2">
               <Btn
                 type="button"
                 variant="secondary"
                 disabled={busy}
                 onClick={() => {
                   if (hasUnsavedBooking) setConfirmDiscard(true);
-                  else setBooking(false);
+                  else resetAndCloseBooking();
                 }}
+                className="flex-1 rounded-xl py-3 font-semibold"
               >
                 Cancel
+              </Btn>
+              <Btn
+                type="submit"
+                disabled={busy || !effectiveClinicId || !patient.data}
+                className="flex-1 rounded-xl py-3 font-bold"
+              >
+                {busy ? "Booking…" : "Confirm Booking"}
               </Btn>
             </div>
           </form>
         </DialogContent>
       </Dialog>
-    </>
+    </div>
   );
 }

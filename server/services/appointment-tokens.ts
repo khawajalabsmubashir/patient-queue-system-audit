@@ -134,3 +134,58 @@ export async function giveUpToken(db: Database, patientId: string, tokenId: stri
     return { id: t.id };
   });
 }
+
+export async function cancelPatientAppointment(
+  db: Database,
+  patientId: string,
+  appointmentId: string,
+) {
+  return atomic(db, async () => {
+    const a = await one<{
+      id: string;
+      clinic_id: string;
+      patient_id: string;
+      status: string;
+      effective_status: string;
+    }>(
+      db,
+      "SELECT a.id,a.clinic_id,a.patient_id,a.status,CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END effective_status FROM appointments a LEFT JOIN appointment_workflow w ON w.appointment_id=a.id WHERE a.id=? AND a.patient_id=?",
+      appointmentId,
+      patientId,
+    );
+    if (!a) throw new ApiError(404, "NOT_FOUND", "Appointment not found.");
+    if (a.effective_status === "cancelled") return { id: a.id, status: "cancelled" };
+    if (["completed", "no_show"].includes(a.effective_status))
+      throw new ApiError(409, "INVALID_STATUS", "This appointment can no longer be cancelled.");
+    const t = await one<{ id: string; status: string }>(
+      db,
+      "SELECT id,status FROM tokens WHERE appointment_id=?",
+      a.id,
+    );
+    const enc = await one<{ id: string }>(
+      db,
+      t
+        ? "SELECT id FROM encounters WHERE appointment_id=? OR token_id=?"
+        : "SELECT id FROM encounters WHERE appointment_id=?",
+      ...(t ? [a.id, t.id] : [a.id]),
+    );
+    if (enc || (t && ["serving", "completed"].includes(t.status)))
+      throw new ApiError(409, "INVALID_STATUS", "This appointment can no longer be cancelled.");
+    const stamp = new Date().toISOString();
+    await db
+      .prepare("UPDATE appointments SET status='cancelled',updated_at=? WHERE id=?")
+      .run(stamp, a.id);
+    await db
+      .prepare(
+        "INSERT INTO appointment_workflow VALUES (?,?,?) ON CONFLICT(appointment_id) DO UPDATE SET status=excluded.status,updated_at=excluded.updated_at",
+      )
+      .run(a.id, "cancelled", stamp);
+    if (t && t.status !== "cancelled") {
+      await db
+        .prepare("UPDATE tokens SET status='cancelled',cancelled_at=?,updated_at=? WHERE id=?")
+        .run(stamp, stamp, t.id);
+    }
+    await audit(db, patientId, "appointment.cancelled", "appointment", a.id, a.clinic_id);
+    return { id: a.id, status: "cancelled" };
+  });
+}

@@ -91,6 +91,8 @@ test(
       const id = booking.data.id;
       const context = await req(`/appointments/${id}/context`, p.cookie);
       assert.equal(context.data.patientNotes, "Patient context: allergies and reports");
+      assert.equal(context.data.patientName, "Workflow Patient");
+      assert.ok(context.data.department);
       assert.ok(!JSON.stringify(context.data).includes("privateNotes"));
       assert.equal((await req(`/appointments/${id}/context`, other.cookie)).status, 404);
       const staffBody = {
@@ -115,9 +117,7 @@ test(
 
       assert.equal(receptionistAppointments.status, 200);
       assert.ok(
-        receptionistAppointments.data.some(
-          (appointment: { id: string }) => appointment.id === id,
-        ),
+        receptionistAppointments.data.some((appointment: { id: string }) => appointment.id === id),
       );
 
       // Receptionists cannot view all clinics or use the admin endpoint.

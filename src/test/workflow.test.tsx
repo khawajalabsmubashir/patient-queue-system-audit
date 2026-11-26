@@ -95,7 +95,7 @@ it("appointment in consultation exposes continue instead of irrelevant mutations
   );
   expect(screen.queryByRole("button", { name: "Check in" })).toBeNull();
 });
-it("patient booking has City and Clinic selection; submits only booking fields", async () => {
+it("patient booking uses a single clinic dropdown without City or Gender and submits directly", async () => {
   f.api.mockImplementation((path: string, options?: { method?: string }) =>
     Promise.resolve(
       path === "/patient/appointments"
@@ -115,14 +115,17 @@ it("patient booking has City and Clinic selection; submits only booking fields",
     ),
   );
   render(<Appointments />);
-  fireEvent.click(screen.getByRole("button", { name: "Book appointment" }));
-  expect(screen.getByRole("button", { name: "City" })).toHaveTextContent("Karachi");
+  fireEvent.click(screen.getByRole("button", { name: /Book Appointment/i }));
+  await screen.findByLabelText("Date of Birth *");
+  expect(screen.queryByRole("button", { name: "City" })).toBeNull();
   expect(screen.queryByRole("button", { name: "Area" })).toBeNull();
-  expect(screen.getByRole("button", { name: "Clinic" })).toHaveTextContent("Health Point");
+  expect(screen.queryByLabelText(/Gender/i)).toBeNull();
+  expect(screen.getByLabelText("Select Clinic / Center")).toHaveTextContent("Health Point");
   expect(screen.getByLabelText("Add supporting files")).toBeVisible();
-  await screen.findByLabelText("Date of birth");
-  fireEvent.click(screen.getByRole("button", { name: "Review booking" }));
-  fireEvent.click(screen.getByRole("button", { name: "Confirm booking" }));
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Confirm Booking" })).not.toBeDisabled(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Confirm Booking" }));
   await waitFor(() =>
     expect(f.api).toHaveBeenCalledWith(
       "/patient/appointments",

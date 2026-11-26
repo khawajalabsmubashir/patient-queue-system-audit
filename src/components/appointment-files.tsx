@@ -1,9 +1,11 @@
 import { uploadPrivateFile } from "@/lib/private-upload";
-import { useState } from "react";
+import { useId, useState } from "react";
+import { Paperclip, Trash2 } from "lucide-react";
 import { api } from "@/api/client";
 import { Btn } from "@/components/qc";
 import { friendlyError } from "@/services/errors";
 import type { AppointmentAttachment } from "@/types/clinical-workflow";
+
 export interface SelectedAttachment {
   key: string;
   file: File;
@@ -12,6 +14,7 @@ export interface SelectedAttachment {
   state: string;
   error: string;
 }
+
 export function AttachmentFields({
   files,
   onChange,
@@ -21,24 +24,41 @@ export function AttachmentFields({
   onChange: (f: SelectedAttachment[]) => void;
   disabled?: boolean;
 }) {
+  const inputId = useId();
   const [error, setError] = useState("");
   return (
-    <section className="space-y-3">
-      <h2>
-        Supporting Documents <span className="text-muted-foreground">(optional)</span>
-      </h2>
-      <p className="text-sm text-muted-foreground">
-        Up to 10 files. PDF, JPEG or PNG, up to 5 MB each. Files remain private.
-      </p>
-      <label className="block text-sm">
-        Choose Files
+    <section className="space-y-2.5">
+      <div className="block text-sm font-medium">
+        Add Medical Document / Report{" "}
+        <span className="font-normal text-muted-foreground">(Optional)</span>
+      </div>
+      <label
+        htmlFor={inputId}
+        className={`flex items-center justify-between gap-3 rounded-xl border border-dashed border-input bg-muted/40 px-4 py-3 transition-colors ${
+          disabled ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-primary"
+        }`}
+      >
+        <div className="flex min-w-0 items-center gap-2.5">
+          <Paperclip className="size-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="truncate text-sm text-muted-foreground">
+            {files.length
+              ? files.length === 1
+                ? files[0]!.file.name
+                : `${files.length} files selected`
+              : "Tap to attach PDF, JPG, or PNG report"}
+          </span>
+        </div>
+        <span className="shrink-0 rounded-lg border border-border bg-card px-3 py-1 text-xs font-semibold text-foreground">
+          Browse
+        </span>
         <input
+          id={inputId}
           aria-label="Add supporting files"
           type="file"
           multiple
           accept="application/pdf,image/jpeg,image/png"
           disabled={disabled}
-          className="mt-2 block w-full text-sm file:mr-3 file:rounded-lg file:border file:border-border file:bg-muted file:px-4 file:py-2"
+          className="sr-only"
           onChange={(e) => {
             const incoming = Array.from(e.target.files ?? []);
             e.target.value = "";
@@ -73,33 +93,51 @@ export function AttachmentFields({
           }}
         />
       </label>
-      {error && <p role="alert">{error}</p>}
+      <p className="text-xs text-muted-foreground">
+        Up to 10 files · PDF, JPG, or PNG up to 5 MB each. Files remain private.
+      </p>
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
       {files.map((f, i) => (
-        <div key={f.key} className="rounded-lg border border-border p-3 space-y-2">
-          <p className="break-all text-sm text-muted-foreground">
-            {f.file.name} · {(f.file.size / 1024).toFixed(0)} KB
-          </p>
-          <p role="status" className="text-sm">
-            {f.state}
-          </p>
-          {f.error && (
-            <p role="alert" className="text-sm text-destructive">
-              {f.error}
+        <div
+          key={f.key}
+          className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card p-3"
+        >
+          <div className="min-w-0 space-y-0.5">
+            <p className="truncate text-sm font-medium text-foreground">
+              {f.file.name}{" "}
+              <span className="font-normal text-muted-foreground">
+                · {(f.file.size / 1024).toFixed(0)} KB
+              </span>
             </p>
-          )}
+            <p role="status" className="text-xs text-muted-foreground">
+              {f.state}
+            </p>
+            {f.error && (
+              <p role="alert" className="text-xs text-destructive">
+                {f.error}
+              </p>
+            )}
+          </div>
           <Btn
             type="button"
             variant="ghost"
             disabled={disabled || f.state === "Uploaded"}
             onClick={() => onChange(files.filter((x) => x.key !== f.key))}
+            className="shrink-0 text-xs text-destructive hover:bg-destructive/10 hover:text-destructive"
           >
-            Remove file {i + 1}
+            <Trash2 className="size-3.5" aria-hidden="true" />
+            <span>Remove file {i + 1}</span>
           </Btn>
         </div>
       ))}
     </section>
   );
 }
+
 export async function uploadAppointmentFiles(
   id: string,
   files: SelectedAttachment[],
@@ -151,6 +189,7 @@ export async function uploadAppointmentFiles(
   }
   return failed;
 }
+
 export function AppointmentFiles({ files }: { files: AppointmentAttachment[] }) {
   const [error, setError] = useState("");
   return (

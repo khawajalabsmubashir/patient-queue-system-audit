@@ -39,12 +39,24 @@ const medicineSchema = z
     active: z.boolean().default(true),
   })
   .strict();
-type Row = Record<string, string | number>;
+type Row = Record<string, string | number | Date | null>;
+function calendarDateValue(value: unknown): string | null {
+  if (value == null) return null;
+  if (value instanceof Date) {
+    return [
+      value.getFullYear(),
+      String(value.getMonth() + 1).padStart(2, "0"),
+      String(value.getDate()).padStart(2, "0"),
+    ].join("-");
+  }
+  const s = String(value).trim();
+  return s ? s.slice(0, 10) : null;
+}
 const fail = () => new ApiError(404, "NOT_FOUND", "Appointment or attachment not found.");
 async function access(db: Database, u: UserRow, id: string, files = false) {
   const a = await one<Row>(
     db,
-    "SELECT a.*,CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END status,c.name clinic_name,COALESCE(n.patient_notes,'') patient_notes FROM appointments a LEFT JOIN appointment_workflow w ON w.appointment_id=a.id JOIN clinics c ON c.id=a.clinic_id LEFT JOIN appointment_context n ON n.appointment_id=a.id WHERE a.id=?",
+    "SELECT a.*,CASE WHEN a.status='completed' THEN 'completed' ELSE COALESCE(w.status,a.status) END status,c.name clinic_name,c.department clinic_department,u.full_name patient_name,pp.date_of_birth,COALESCE(n.patient_notes,'') patient_notes FROM appointments a LEFT JOIN appointment_workflow w ON w.appointment_id=a.id JOIN clinics c ON c.id=a.clinic_id JOIN users u ON u.id=a.patient_id LEFT JOIN patient_profiles pp ON pp.user_id=a.patient_id LEFT JOIN appointment_context n ON n.appointment_id=a.id WHERE a.id=?",
     id,
   );
   if (!a) throw fail();
@@ -91,27 +103,86 @@ export function clinicalWorkflowRoutes(db: Database, provided?: DocumentStorage)
     storage = provided ?? new SupabaseDocumentStorage();
   r.get("/appointments/:id/context", auth, async (req, res) => {
     const a = await access(db, res.locals["user"], idValue.parse(req.params["id"]));
-    const files = await many<Row>(
-      db,
-      "SELECT * FROM appointment_attachments WHERE appointment_id=? AND status<>'discarded' ORDER BY created_at",
-      String(a["id"]),
-    );
+    const [files, token] = await Promise.all([
+      many<Row>(
+        db,
+        "SELECT * FROM appointment_attachments WHERE appointment_id=? AND status<>'discarded' ORDER BY created_at",
+        String(a["id"]),
+      ),
+      one<{ id: string; tokenCode: string; status: string }>(
+        db,
+        'SELECT id,token_code AS "tokenCode",status FROM tokens WHERE appointment_id=?',
+        String(a["id"]),
+      ),
+    ]);
+    let visitId: string | null = null;
+    let prescriptionSummary: string | null = null;
+    if (String(a["status"]) === "completed") {
+      const encounter = await one<Row>(
+        db,
+        token
+          ? "SELECT id,patient_summary FROM encounters WHERE (appointment_id=? OR token_id=?) AND status='completed' ORDER BY visit_at DESC LIMIT 1"
+          : "SELECT id,patient_summary FROM encounters WHERE appointment_id=? AND status='completed' ORDER BY visit_at DESC LIMIT 1",
+        ...(token ? [String(a["id"]), String(token.id)] : [String(a["id"])]),
+      );
+      if (encounter) {
+        visitId = String(encounter["id"]);
+        const rx = await one<Row>(
+          db,
+          "SELECT id,instructions FROM prescriptions WHERE encounter_id=? LIMIT 1",
+          visitId,
+        );
+        const rxItems = rx
+          ? await many<Row>(
+              db,
+              "SELECT i.medicine,i.dose,i.frequency,i.duration,i.instructions,d.strength,d.dosage_form FROM prescription_items i LEFT JOIN prescription_item_details d ON d.item_id=i.id WHERE i.prescription_id=? ORDER BY i.position",
+              String(rx["id"]),
+            )
+          : [];
+        const formattedItems = rxItems
+          .map((item) =>
+            [
+              item["dosage_form"],
+              item["medicine"],
+              item["strength"],
+              item["dose"],
+              item["frequency"],
+              item["duration"],
+            ]
+              .map((part) => String(part ?? "").trim())
+              .filter(Boolean)
+              .join(" "),
+          )
+          .filter(Boolean);
+        const rxNotes = String(rx?.["instructions"] ?? "").trim();
+        const summaryNote = String(encounter["patient_summary"] ?? "").trim();
+        if (formattedItems.length) {
+          const joined =
+            formattedItems.length === 2 ? formattedItems.join(" & ") : formattedItems.join(", ");
+          prescriptionSummary = rxNotes ? `${joined}. ${rxNotes}` : joined;
+        } else {
+          prescriptionSummary =
+            rxNotes || summaryNote || "Consultation completed. Prescription ready to download.";
+        }
+      }
+    }
     res.json({
       success: true,
       data: {
         id: a["id"],
-        token: await one(
-          db,
-          'SELECT id,token_code AS "tokenCode",status FROM tokens WHERE appointment_id=?',
-          String(a["id"]),
-        ),
+        token: token ?? null,
         clinicId: a["clinic_id"],
         clinicName: a["clinic_name"],
+        department: String(a["clinic_department"] ?? ""),
         patientId: a["patient_id"],
+        patientName: String(a["patient_name"] ?? ""),
+        dateOfBirth: calendarDateValue(a["date_of_birth"]),
         scheduledAt: a["scheduled_at"],
         status: a["status"],
         reason: a["reason"],
         patientNotes: a["patient_notes"],
+        visitId,
+        prescriptionSummary,
         attachments: files.map(dto),
       },
     });
