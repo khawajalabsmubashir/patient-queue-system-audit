@@ -471,13 +471,7 @@ export function finalRoutes(db: Database, notify: Notify) {
         "SELECT e.id,e.clinic_id,e.visit_at,c.name clinic_name FROM encounters e JOIN clinics c ON c.id=e.clinic_id WHERE e.patient_id=? AND e.status='completed' ORDER BY e.visit_at DESC LIMIT 10",
         id,
       ),
-      many<{
-        id: string;
-        visit_id: string;
-        clinic_id: string;
-        clinic_name: string;
-        prescribed_at: string;
-      }>(
+      many<{ id: string; visit_id: string; clinic_id: string; clinic_name: string; prescribed_at: string }>(
         db,
         "SELECT p.id,e.id visit_id,e.clinic_id,c.name clinic_name,p.prescribed_at FROM prescriptions p JOIN encounters e ON e.id=p.encounter_id JOIN clinics c ON c.id=e.clinic_id WHERE e.patient_id=? AND e.status='completed' ORDER BY p.prescribed_at DESC LIMIT 10",
         id,
@@ -504,20 +498,14 @@ export function finalRoutes(db: Database, notify: Notify) {
       data: {
         appointment: appts[0] ?? null,
         appointments: appts,
-        visit:
-          (clinicFilter ? visits.find((v) => v["clinic_id"] === clinicFilter) : visits[0]) ??
-          visits[0] ??
-          null,
+        visit: (clinicFilter ? visits.find((v) => v["clinic_id"] === clinicFilter) : visits[0]) ?? visits[0] ?? null,
         visits,
-        prescription:
-          (clinicFilter ? rx.find((p) => p["clinic_id"] === clinicFilter) : rx[0]) ?? rx[0] ?? null,
+        prescription: (clinicFilter ? rx.find((p) => p["clinic_id"] === clinicFilter) : rx[0]) ?? rx[0] ?? null,
         prescriptions: rx,
         document: docs[0] ?? null,
         bills,
         notifications: notes,
-        followups: followups.filter(
-          (x) => x.status !== "completed" && (!clinicFilter || x["clinic_id"] === clinicFilter),
-        ),
+        followups: followups.filter((x) => x.status !== "completed" && (!clinicFilter || x["clinic_id"] === clinicFilter)),
       },
     });
   });
@@ -556,10 +544,12 @@ export function finalRoutes(db: Database, notify: Notify) {
     send(res, { revoked: true });
   });
   r.put("/account/password", auth, async (req, res) => {
-    const p = z.string().superRefine((x, ctx) => {
-        const check = validatePassword(x, 12);
-        if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
-      }),
+    const p = z
+        .string()
+        .superRefine((x, ctx) => {
+          const check = validatePassword(x, 12);
+          if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+        }),
       c = z
         .object({ currentPassword: z.string().max(72), newPassword: p })
         .strict()

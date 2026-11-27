@@ -211,9 +211,7 @@ export function operationsRoutes(
           .prepare("INSERT INTO users VALUES (?,?,?,?,?,?,?,?)")
           .run(pid, cleanName, finalEmail, cleanPhone, unusedWalkInHash, "patient", now, now);
         await db
-          .prepare(
-            "INSERT INTO patient_profiles(user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING",
-          )
+          .prepare("INSERT INTO patient_profiles(user_id) VALUES (?) ON CONFLICT(user_id) DO NOTHING")
           .run(pid);
         await audit(db, u.id, "patient.walkin_created", "patient", pid, clinicId);
         return pid;
@@ -459,8 +457,8 @@ export function operationsRoutes(
       clinic = scope(req),
       patient = req.query["patientId"] ? idValue.parse(req.query["patientId"]) : null,
       visit = req.query["visitId"] ? idValue.parse(req.query["visitId"]) : null;
-    let where = "d.status='ready'";
-    const args: string[] = [];
+    let where = "d.status='ready'",
+      args: string[] = [];
     if (u.role === "patient") {
       where += " AND d.patient_id=? AND d.patient_visible=1";
       args.push(u.id);

@@ -26,12 +26,7 @@ export function Patients() {
   );
   const remote = useClinicalData<PatientSearchRow[]>(
     "/admin/patients/search?" +
-      new URLSearchParams({
-        q: debouncedQ,
-        clinicId: clinic,
-        conditionId: group,
-        clinical: debouncedClinical,
-      }),
+      new URLSearchParams({ q: debouncedQ, clinicId: clinic, conditionId: group, clinical: debouncedClinical }),
     { keepPreviousData: true },
   );
   useEffect(() => {

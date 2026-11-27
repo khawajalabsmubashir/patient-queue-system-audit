@@ -286,22 +286,16 @@ test("clinical workflow: global profiles, structured notes/vitals/prescriptions,
     );
     const completedVisits = (await req("/patient/visits", patient.cookie)).data;
     assert.ok(completedVisits.length >= 1);
-    const pdfRes = await fetch(
-      `http://127.0.0.1:${port}/api/patient/visits/${completedVisits[0].id}/prescription-pdf`,
-      {
-        headers: { cookie: patient.cookie },
-      },
-    );
+    const pdfRes = await fetch(`http://127.0.0.1:${port}/api/patient/visits/${completedVisits[0].id}/prescription-pdf`, {
+      headers: { cookie: patient.cookie },
+    });
     assert.equal(pdfRes.status, 200);
     assert.match(pdfRes.headers.get("content-type") || "", /application\/pdf/);
     const pdfText = Buffer.from(await pdfRes.arrayBuffer()).toString("latin1");
     assert.ok(pdfText.startsWith("%PDF-"));
-    const otherPdfRes = await fetch(
-      `http://127.0.0.1:${port}/api/patient/visits/${completedVisits[0].id}/prescription-pdf`,
-      {
-        headers: { cookie: other.cookie },
-      },
-    );
+    const otherPdfRes = await fetch(`http://127.0.0.1:${port}/api/patient/visits/${completedVisits[0].id}/prescription-pdf`, {
+      headers: { cookie: other.cookie },
+    });
     assert.equal(otherPdfRes.status, 404);
   } finally {
     await app.close();

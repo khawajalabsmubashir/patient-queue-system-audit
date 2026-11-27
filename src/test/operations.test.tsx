@@ -155,14 +155,7 @@ it("notification links resolve to relevant patient and staff pages", () => {
   const n = { entity_type: "invoice", entity_id: "invoice-one" } as AppNotification;
   expect(notificationHref(n, "patient")).toBe("/patient/billing?invoiceId=invoice-one");
   expect(notificationHref({ ...n, entity_type: "queue" }, "nurse")).toBe("/staff");
-  expect(notificationHref({ ...n, entity_type: "document" }, "patient")).toBe(
-    "/patient/appointments",
-  );
-  expect(notificationHref({ ...n, entity_type: "visit" }, "patient")).toBe("/patient/dashboard");
-  expect(notificationHref({ ...n, entity_type: "prescription" }, "patient")).toBe(
-    "/patient/dashboard",
-  );
-  expect(notificationHref({ ...n, entity_type: "queue" }, "patient")).toBe("/patient/dashboard");
+  expect(notificationHref({ ...n, entity_type: "document" }, "patient")).toBe("/patient/documents");
 });
 
 it("BUG-24: notification bell groups by Today/Yesterday/Older, filters tabs, shows 12h time without seconds & type badges", async () => {

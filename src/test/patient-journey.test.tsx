@@ -10,23 +10,7 @@ vi.mock("@/api/client", () => ({
           followups: [],
           notifications: [],
         }
-      : path === "/patient/profile"
-        ? {
-            id: "u1",
-            fullName: "Zain",
-            email: "zain@example.com",
-            phone: "03001234567",
-            dateOfBirth: "1995-01-01",
-            gender: "male",
-            address: "",
-            emergencyContactName: "",
-            emergencyContactPhone: "",
-            bloodGroup: "",
-            allergies: "",
-            chronicConditions: "",
-            currentMedications: "",
-          }
-        : [],
+      : [],
   ),
 }));
 vi.mock("@/components/protected-route", () => ({
@@ -54,14 +38,15 @@ import { actions } from "@/test/fixtures/queue-store";
 import { Route as LoginRoute } from "@/routes/login";
 import { Route as PatientRoute } from "@/routes/patient";
 import { Route as DashboardRoute } from "@/routes/patient.dashboard";
-import { Appointments } from "@/routes/patient.appointments";
+import { Join } from "@/routes/patient.join-queue";
+import { QueuePage } from "@/routes/patient.queue";
+import { Route as HistoryRoute } from "@/routes/patient.history";
 
 beforeEach(() => {
   cleanup();
   actions.resetDemo();
 });
 afterEach(cleanup);
-
 function renderPatientApp() {
   const root = createRootRouteWithContext<{ queryClient: QueryClient }>()({ component: Outlet });
   const login = createRoute({
@@ -79,21 +64,26 @@ function renderPatientApp() {
     path: "dashboard",
     component: DashboardRoute.options.component!,
   });
-  const appointments = createRoute({
+  const join = createRoute({ getParentRoute: () => patient, path: "get-token", component: Join });
+  const queue = createRoute({
     getParentRoute: () => patient,
-    path: "appointments",
-    component: Appointments,
+    path: "live-queue",
+    component: QueuePage,
+  });
+  const history = createRoute({
+    getParentRoute: () => patient,
+    path: "history",
+    component: HistoryRoute.options.component!,
   });
   const router = createRouter({
-    routeTree: root.addChildren([login, patient.addChildren([dashboard, appointments])]),
+    routeTree: root.addChildren([login, patient.addChildren([dashboard, join, queue, history])]),
     history: createMemoryHistory({ initialEntries: ["/login"] }),
     context: { queryClient: new QueryClient() },
   });
   render(<RouterProvider router={router} />);
   return router;
 }
-
-it("preserves login, anonymous appointment-token tracking on home, and appointments navigation", async () => {
+it("preserves login, anonymous appointment-token tracking, completion and history", async () => {
   const router = renderPatientApp();
   await screen.findByRole("heading", { name: "Welcome back" });
   fireEvent.change(screen.getByRole("textbox", { name: "Email" }), {
@@ -101,26 +91,28 @@ it("preserves login, anonymous appointment-token tracking on home, and appointme
   });
   fireEvent.change(screen.getByLabelText("Password"), { target: { value: "TestPassword123!" } });
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-
   await screen.findByRole("heading", { name: "Welcome, Zain" });
-  const queueRegion = screen.getByRole("region", { name: "Live queue status" });
-  expect(within(queueRegion).getAllByText("~20 min").length).toBeGreaterThanOrEqual(1);
-  expect(within(queueRegion).queryByRole("link", { name: /Live queue/i })).toBeNull();
+  expect(screen.getAllByText("~20 min").length).toBeGreaterThanOrEqual(1);
+  await act(async () => {
+    await router.navigate({ to: "/patient/live-queue" });
+  });
+  await screen.findByRole("heading", { name: "Live queue" });
   expect(screen.queryByText("Sara Ali")).not.toBeInTheDocument();
   expect(screen.queryByText("Ahmed Khan")).not.toBeInTheDocument();
-
+  act(() => actions.demo("almost"));
+  expect(screen.getByRole("status")).toHaveTextContent("2 patients are ahead");
   act(() => actions.call("A-024"));
-  expect(within(queueRegion).getByText("Your turn now — please proceed")).toBeInTheDocument();
+  expect(screen.getByRole("status")).toHaveTextContent("Your token is being called");
   act(() => actions.markDone());
-  expect(within(queueRegion).getByText("Visit completed.")).toBeInTheDocument();
-
+  expect(screen.getByRole("status")).toHaveTextContent("Visit completed");
   await act(async () => {
-    await router.navigate({ to: "/patient/appointments" });
+    await router.navigate({ to: "/patient/history" });
   });
-  await screen.findByRole("heading", { name: "Your Appointments" });
-  await waitFor(() => expect(router.state.location.pathname).toBe("/patient/appointments"));
+  await screen.findByRole("heading", { name: "Visit history" });
+  expect(screen.getByText("Oct 5, 2026")).toBeInTheDocument();
+  expect(screen.getByText("A-024")).toBeInTheDocument();
+  await waitFor(() => expect(router.state.location.pathname).toBe("/patient/history"));
 }, 15000);
-
 it.each(["no-queue", "completed"] as const)(
   "dashboard preserves the original %s token state",
   async (scenario) => {

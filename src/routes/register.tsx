@@ -118,8 +118,7 @@ export function Register() {
                 required
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Letters, spaces, hyphens, apostrophes or periods (max {MAX_FULL_NAME_LENGTH}{" "}
-                characters).
+                Letters, spaces, hyphens, apostrophes or periods (max {MAX_FULL_NAME_LENGTH} characters).
               </p>
             </div>
             <Field label="Email" name="email" type="email" autoComplete="email" required />

@@ -22,7 +22,9 @@ export function containsCodeOrSqlInjection(value: string): boolean {
   );
 }
 
-export type ValidationResult = { ok: true; value: string } | { ok: false; error: string };
+export type ValidationResult =
+  | { ok: true; value: string }
+  | { ok: false; error: string };
 
 export function validatePersonName(
   raw: string,
@@ -120,7 +122,10 @@ export function validatePhoneNumber(raw: string): ValidationResult {
   return { ok: true, value: normalized };
 }
 
-export function validatePassword(raw: string, minLength = MIN_PASSWORD_LENGTH): ValidationResult {
+export function validatePassword(
+  raw: string,
+  minLength = MIN_PASSWORD_LENGTH,
+): ValidationResult {
   if (!raw || raw.trim().length === 0) {
     return {
       ok: false,

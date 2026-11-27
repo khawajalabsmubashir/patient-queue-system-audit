@@ -5,7 +5,6 @@ import { DocumentsPanel } from "@/components/documents-panel";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { toast } from "sonner";
-import { AppLink } from "@/components/app-link";
 import { PageHeader, Btn } from "@/components/qc";
 import {
   useClinicalData,
@@ -58,9 +57,9 @@ function Consultation() {
         ) : (
           <>
             <div className="mb-6 flex flex-wrap items-center gap-4">
-              <AppLink href={"/admin?clinicId=" + v.clinicId}>
+              <a href={"/admin?clinicId=" + v.clinicId}>
                 <Btn>Back to today’s queue</Btn>
-              </AppLink>
+              </a>
               <NextPatient clinicId={v.clinicId} patientId={v.patientId} />
             </div>
             <div className="surface grid gap-5 p-6 md:grid-cols-2">

@@ -94,16 +94,11 @@ test(
       // Updating a clinic updates its synced doctor schedule hours too.
       assert.equal(
         (
-          await req(
-            "/admin/clinics/" + branch.data.id,
-            admin.cookie,
-            {
-              ...body,
-              opening: "17:00",
-              closing: "19:00",
-            },
-            "PUT",
-          )
+          await req("/admin/clinics/" + branch.data.id, admin.cookie, {
+            ...body,
+            opening: "17:00",
+            closing: "19:00",
+          }, "PUT")
         ).status,
         200,
       );

@@ -192,10 +192,7 @@ test("audit fixes: backend validation rejects oversized/SQL/script inputs and >5
     assert.equal(reception.status, 200);
 
     const targetDate = "2030-01-07";
-    const slotsRes = await req(
-      "/appointments/available-slots?clinicId=northstar&date=" + targetDate,
-      reception.cookie,
-    );
+    const slotsRes = await req("/appointments/available-slots?clinicId=northstar&date=" + targetDate, reception.cookie);
     assert.equal(slotsRes.status, 200);
     const firstSlot = slotsRes.json.data.slots[0]?.value ?? `${targetDate}T09:00`;
     const secondSlot = slotsRes.json.data.slots[1]?.value ?? `${targetDate}T09:15`;
@@ -236,28 +233,18 @@ test("audit fixes: backend validation rejects oversized/SQL/script inputs and >5
     assert.equal(wrongClinicRes.status, 403);
 
     // BUG-10: Reject reusing current password as new password
-    const samePwRes = await req(
-      "/account/password",
-      okPatient.cookie,
-      {
-        currentPassword: "Password123!",
-        newPassword: "Password123!",
-      },
-      "PUT",
-    );
+    const samePwRes = await req("/account/password", okPatient.cookie, {
+      currentPassword: "Password123!",
+      newPassword: "Password123!",
+    }, "PUT");
     assert.equal(samePwRes.status, 400);
-    assert.equal(
-      samePwRes.json.error.message,
-      "New password must be different from the current password.",
-    );
+    assert.equal(samePwRes.json.error.message, "New password must be different from the current password.");
 
     // BUG-22 & BUG-23: /patient/appointments & /patient/summary return nearest upcoming appointments in ascending order with clinic_id
     const listApptsRes = await req("/patient/appointments", okPatient.cookie);
     assert.equal(listApptsRes.status, 200);
     const listAppts = listApptsRes.json.data as Array<{ status: string; scheduledAt: string }>;
-    const activeUpcoming = listAppts.filter((a) =>
-      ["scheduled", "confirmed", "checked_in"].includes(a.status),
-    );
+    const activeUpcoming = listAppts.filter((a) => ["scheduled", "confirmed", "checked_in"].includes(a.status));
     for (let i = 1; i < activeUpcoming.length; i++) {
       assert.ok(activeUpcoming[i - 1]!.scheduledAt <= activeUpcoming[i]!.scheduledAt);
     }
@@ -273,9 +260,7 @@ test("audit fixes: backend validation rejects oversized/SQL/script inputs and >5
         portal: "patient",
       });
       assert.equal(failLogin.status, attempt >= 5 ? 429 : 401);
-      assert.ok(
-        typeof failLogin.json.error.message === "string" && failLogin.json.error.message.length > 0,
-      );
+      assert.ok(typeof failLogin.json.error.message === "string" && failLogin.json.error.message.length > 0);
     }
   } finally {
     await app.close();

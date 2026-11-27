@@ -32,7 +32,7 @@ vi.mock("@/lib/queue-store", async () => {
           new Date(),
         ),
         setHistoryDate: () => {},
-        setQueueDate: () => {},
+        setQueueDate: ()=>{},
       };
     },
   };

@@ -38,20 +38,14 @@ const date = z
   .nullable();
 export const demographicsSchema = z
   .object({
-    fullName: z
-      .string()
-      .superRefine((val, ctx) => {
-        const check = validatePersonName(val, "Full name");
-        if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
-      })
-      .transform((val) => val.trim().replace(/\s+/g, " ")),
-    phone: z
-      .string()
-      .superRefine((val, ctx) => {
-        const check = validatePhoneNumber(val);
-        if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
-      })
-      .transform((val) => val.trim().replace(/\s+/g, " ")),
+    fullName: z.string().superRefine((val, ctx) => {
+      const check = validatePersonName(val, "Full name");
+      if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+    }).transform((val) => val.trim().replace(/\s+/g, " ")),
+    phone: z.string().superRefine((val, ctx) => {
+      const check = validatePhoneNumber(val);
+      if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+    }).transform((val) => val.trim().replace(/\s+/g, " ")),
     dateOfBirth: date.refine(
       (s) => !s || s <= patientToday(),
       "Date of birth cannot be in the future.",

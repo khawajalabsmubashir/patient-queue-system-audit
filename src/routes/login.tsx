@@ -117,22 +117,19 @@ function Login() {
           <p className="mt-1.5 text-sm text-muted-foreground">Sign in to manage your visit.</p>
 
           <div className="mt-7 grid grid-cols-2 rounded-lg bg-muted p-1 text-sm">
-            {(["patient", "staff"] as const).map((r) => (
-              <button
-                key={r}
-                type="button"
-                onClick={() => {
-                  setRole(r);
-                  setError("");
-                }}
-                className={cn(
-                  "rounded-md py-2 font-medium capitalize transition",
-                  role === r ? "bg-card shadow-soft" : "text-muted-foreground",
-                )}
-              >
-                {r === "staff" ? "Clinic staff" : "Patient"}
-              </button>
-            ))}
+          {(["patient", "staff"] as const).map((r) => (
+            <button
+              key={r}
+              type="button"
+              onClick={() => { setRole(r); setError(""); }}
+              className={cn(
+                "rounded-md py-2 font-medium capitalize transition",
+                role === r ? "bg-card shadow-soft" : "text-muted-foreground",
+              )}
+            >
+              {r === "staff" ? "Clinic staff" : "Patient"}
+            </button>
+          ))}
           </div>
 
           <form onSubmit={submit} noValidate className="mt-6 space-y-4">

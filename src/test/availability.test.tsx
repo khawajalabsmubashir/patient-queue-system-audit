@@ -102,9 +102,7 @@ it("clinics creation informs admin that booking follows clinic opening and closi
   fireEvent.change(screen.getByLabelText("Address *"), { target: { value: "Clifton" } });
   fireEvent.change(screen.getByLabelText("Phone *"), { target: { value: "03001112233" } });
   fireEvent.click(screen.getByRole("button", { name: "Save clinic" }));
-  expect(
-    await screen.findByText(/Appointment slots automatically follow Care Clinic/i),
-  ).toBeVisible();
+  expect(await screen.findByText(/Appointment slots automatically follow Care Clinic/i)).toBeVisible();
   expect(screen.queryByRole("link", { name: /Set doctor schedule/i })).toBeNull();
   expect(screen.getByRole("link", { name: /View appointments/i })).toHaveAttribute(
     "href",

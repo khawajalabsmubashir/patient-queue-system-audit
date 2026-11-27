@@ -236,9 +236,7 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <div>
                   <h2 className="font-semibold">Patient visits</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Daily consultations in selected range
-                  </p>
+                  <p className="text-xs text-muted-foreground">Daily consultations in selected range</p>
                 </div>
                 <span className="tabular-nums text-sm font-semibold text-primary">
                   {data.totals.completed} completed
@@ -246,15 +244,8 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               </div>
               {trendChartData.length ? (
                 <div className="h-60 w-full min-w-0">
-                  <ResponsiveContainer
-                    width="100%"
-                    height={240}
-                    initialDimension={{ width: 480, height: 240 }}
-                  >
-                    <AreaChart
-                      data={trendChartData}
-                      margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
-                    >
+                  <ResponsiveContainer width="100%" height={240} initialDimension={{ width: 480, height: 240 }}>
+                    <AreaChart data={trendChartData} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
                       <defs>
                         <linearGradient id="visitsFill" x1="0" y1="0" x2="0" y2="1">
                           <stop offset="5%" stopColor="#0f766e" stopOpacity={0.28} />
@@ -288,9 +279,7 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <div>
                   <h2 className="font-semibold">Average queue wait (minutes)</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Mean minutes from token issue to call
-                  </p>
+                  <p className="text-xs text-muted-foreground">Mean minutes from token issue to call</p>
                 </div>
                 <span className="tabular-nums text-sm font-semibold text-foreground">
                   {data.totals.averageWait} min avg
@@ -298,15 +287,8 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               </div>
               {trendChartData.length ? (
                 <div className="h-60 w-full min-w-0">
-                  <ResponsiveContainer
-                    width="100%"
-                    height={240}
-                    initialDimension={{ width: 480, height: 240 }}
-                  >
-                    <LineChart
-                      data={trendChartData}
-                      margin={{ top: 8, right: 12, left: -16, bottom: 0 }}
-                    >
+                  <ResponsiveContainer width="100%" height={240} initialDimension={{ width: 480, height: 240 }}>
+                    <LineChart data={trendChartData} margin={{ top: 8, right: 12, left: -16, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
                       <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#64748b" />
@@ -335,9 +317,7 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <div>
                   <h2 className="font-semibold">Revenue trend</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Daily collected consultation revenue
-                  </p>
+                  <p className="text-xs text-muted-foreground">Daily collected consultation revenue</p>
                 </div>
                 <span className="tabular-nums text-sm font-semibold text-foreground">
                   {money(data.totals.revenue)}
@@ -345,15 +325,8 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               </div>
               {trendChartData.length ? (
                 <div className="h-60 w-full min-w-0">
-                  <ResponsiveContainer
-                    width="100%"
-                    height={240}
-                    initialDimension={{ width: 480, height: 240 }}
-                  >
-                    <BarChart
-                      data={trendChartData}
-                      margin={{ top: 8, right: 12, left: -8, bottom: 0 }}
-                    >
+                  <ResponsiveContainer width="100%" height={240} initialDimension={{ width: 480, height: 240 }}>
+                    <BarChart data={trendChartData} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="label" tick={{ fontSize: 12 }} stroke="#64748b" />
                       <YAxis
@@ -379,9 +352,7 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               <div className="mb-4 flex items-baseline justify-between gap-2">
                 <div>
                   <h2 className="font-semibold">Appointment status</h2>
-                  <p className="text-xs text-muted-foreground">
-                    Distribution across booking states
-                  </p>
+                  <p className="text-xs text-muted-foreground">Distribution across booking states</p>
                 </div>
                 <span className="tabular-nums text-sm font-semibold text-foreground">
                   {data.totals.appointments} total
@@ -390,11 +361,7 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
               {data.statuses.length ? (
                 <div className="grid items-center gap-4 sm:grid-cols-[1fr_1.1fr]">
                   <div className="h-56 w-full min-w-0">
-                    <ResponsiveContainer
-                      width="100%"
-                      height={224}
-                      initialDimension={{ width: 260, height: 224 }}
-                    >
+                    <ResponsiveContainer width="100%" height={224} initialDimension={{ width: 260, height: 224 }}>
                       <PieChart>
                         <Pie
                           data={data.statuses}
@@ -425,7 +392,9 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
                   </div>
                   <ul className="space-y-2.5 text-sm">
                     {data.statuses.map((s, index) => {
-                      const pct = totalStatuses ? Math.round((s.count / totalStatuses) * 100) : 0;
+                      const pct = totalStatuses
+                        ? Math.round((s.count / totalStatuses) * 100)
+                        : 0;
                       const color =
                         STATUS_COLORS[s.status] ?? CHART_PALETTE[index % CHART_PALETTE.length]!;
                       return (
@@ -468,34 +437,15 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
             {clinicChartData.length ? (
               <>
                 <div className="mb-6 h-64 w-full min-w-0">
-                  <ResponsiveContainer
-                    width="100%"
-                    height={256}
-                    initialDimension={{ width: 640, height: 256 }}
-                  >
-                    <BarChart
-                      data={clinicChartData}
-                      margin={{ top: 8, right: 16, left: -16, bottom: 0 }}
-                    >
+                  <ResponsiveContainer width="100%" height={256} initialDimension={{ width: 640, height: 256 }}>
+                    <BarChart data={clinicChartData} margin={{ top: 8, right: 16, left: -16, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
                       <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#64748b" />
                       <YAxis allowDecimals={false} tick={{ fontSize: 12 }} stroke="#64748b" />
-                      <Tooltip
-                        labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""}
-                      />
+                      <Tooltip labelFormatter={(_, payload) => payload?.[0]?.payload?.fullName ?? ""} />
                       <Legend wrapperStyle={{ fontSize: 12 }} />
-                      <Bar
-                        dataKey="Appointments"
-                        fill="#0f766e"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={32}
-                      />
-                      <Bar
-                        dataKey="Completed"
-                        fill="#10b981"
-                        radius={[4, 4, 0, 0]}
-                        maxBarSize={32}
-                      />
+                      <Bar dataKey="Appointments" fill="#0f766e" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                      <Bar dataKey="Completed" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={32} />
                       <Bar dataKey="Waiting" fill="#f59e0b" radius={[4, 4, 0, 0]} maxBarSize={32} />
                     </BarChart>
                   </ResponsiveContainer>
@@ -504,18 +454,13 @@ export function OperationalAnalytics({ reports = false }: { reports?: boolean })
                   <table className="w-full text-left text-sm">
                     <thead>
                       <tr>
-                        {[
-                          "Clinic",
-                          "Appointments",
-                          "Waiting",
-                          "Completed",
-                          "Avg wait",
-                          "Revenue",
-                        ].map((x) => (
-                          <th className="p-2 text-xs font-semibold text-muted-foreground" key={x}>
-                            {x}
-                          </th>
-                        ))}
+                        {["Clinic", "Appointments", "Waiting", "Completed", "Avg wait", "Revenue"].map(
+                          (x) => (
+                            <th className="p-2 text-xs font-semibold text-muted-foreground" key={x}>
+                              {x}
+                            </th>
+                          ),
+                        )}
                       </tr>
                     </thead>
                     <tbody>
@@ -1046,7 +991,8 @@ export function AccountSecurityPanel({ embedded = false }: { embedded?: boolean 
         <ul className="space-y-2 text-sm text-muted-foreground">
           {d.sessions.map((s, i) => (
             <li key={i}>
-              {s.current ? "This session" : "Other session"} · Expires {formatDateTime(s.expiresAt)}
+              {s.current ? "This session" : "Other session"} · Expires{" "}
+              {formatDateTime(s.expiresAt)}
             </li>
           ))}
         </ul>
@@ -1086,19 +1032,8 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
   const { selected } = useClinicContext();
   const activeClinicId = selected && selected !== "all" ? selected : "";
   const remote = useClinicalData<{
-    appointment: {
-      clinic_id?: string;
-      scheduled_at: string;
-      clinic_name: string;
-      status?: string;
-    } | null;
-    appointments?: {
-      id: string;
-      clinic_id: string;
-      scheduled_at: string;
-      clinic_name: string;
-      status?: string;
-    }[];
+    appointment: { clinic_id?: string; scheduled_at: string; clinic_name: string; status?: string } | null;
+    appointments?: { id: string; clinic_id: string; scheduled_at: string; clinic_name: string; status?: string }[];
     visit: { clinic_id?: string; visit_at: string; clinic_name: string } | null;
     visits?: { clinic_id?: string; visit_at: string; clinic_name: string }[];
     prescription: { clinic_id?: string; clinic_name?: string; prescribed_at: string } | null;
@@ -1155,9 +1090,7 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
                 <AppointmentStatusBadge status={upcomingAppointment.status || "scheduled"} />
               </div>
               <p className="tabular-nums mt-1 break-words text-sm text-muted-foreground">
-                {formatDateTime(upcomingAppointment.scheduled_at) +
-                  " · " +
-                  upcomingAppointment.clinic_name}
+                {formatDateTime(upcomingAppointment.scheduled_at) + " · " + upcomingAppointment.clinic_name}
               </p>
             </a>
           ) : (
@@ -1187,7 +1120,10 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
         <div className="surface p-5">
           <div className="grid gap-3 sm:grid-cols-2">
             {latestVisit && (
-              <div className="flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4">
+              <a
+                href="/patient/visits"
+                className="group flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4 transition hover:border-primary/40 hover:bg-card"
+              >
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                     Latest visit
@@ -1199,11 +1135,17 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
                     {latestVisit.clinic_name}
                   </p>
                 </div>
-              </div>
+                <span className="mt-4 text-xs font-medium text-primary group-hover:underline">
+                  View visit →
+                </span>
+              </a>
             )}
 
             {latestPrescription && (
-              <div className="flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4">
+              <a
+                href="/patient/prescriptions"
+                className="group flex flex-col justify-between rounded-xl border border-border/80 bg-background/60 p-4 transition hover:border-primary/40 hover:bg-card"
+              >
                 <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
                     Latest prescription
@@ -1215,8 +1157,13 @@ export function PatientSummary({ hideUpcoming = false }: { hideUpcoming?: boolea
                     {latestPrescription.clinic_name || clinic.name || "Neuro Spine Care Center"}
                   </p>
                 </div>
-              </div>
+                <span className="mt-4 text-xs font-medium text-primary group-hover:underline">
+                  View prescription →
+                </span>
+              </a>
             )}
+
+
           </div>
         </div>
       )}

@@ -2,11 +2,7 @@ import { Router, type Request, type Response } from "express";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { hash } from "bcryptjs";
 import { z } from "zod";
-import {
-  validatePassword,
-  validatePersonName,
-  validatePhoneNumber,
-} from "../../src/domain/input-validation.ts";
+import { validatePassword, validatePersonName, validatePhoneNumber } from "../../src/domain/input-validation.ts";
 import { atomic, one, type Database, type UserRow } from "../db/database.ts";
 import { ApiError, publicUser, startSession, authCookieOptions } from "../middleware/auth.ts";
 import type { AuthOptions, GoogleIdentity } from "../services/identity.ts";
@@ -37,10 +33,12 @@ const profile = z
     phone,
   })
   .strict();
-const password = z.string().superRefine((value, ctx) => {
-  const check = validatePassword(value, 8);
-  if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
-});
+const password = z
+  .string()
+  .superRefine((value, ctx) => {
+    const check = validatePassword(value, 8);
+    if (!check.ok) ctx.addIssue({ code: z.ZodIssueCode.custom, message: check.error });
+  });
 const resetInput = z
   .object({
     token: z.string().regex(/^[a-f0-9]{64}$/, "This reset link is invalid or expired."),

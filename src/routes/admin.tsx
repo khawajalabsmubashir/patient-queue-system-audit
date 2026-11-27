@@ -6,17 +6,7 @@ import { logout } from "@/services/auth";
 import { runAction } from "@/services/queue";
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import {
-  BarChart3,
-  History,
-  LayoutGrid,
-  ListOrdered,
-  Monitor,
-  Users,
-  Menu,
-  LogOut,
-  ShieldCheck,
-} from "lucide-react";
+import { BarChart3, History, LayoutGrid, ListOrdered, Monitor, Users, Menu, LogOut, ShieldCheck } from "lucide-react";
 import { Logo, LiveDot } from "@/components/qc";
 import { useQueue } from "@/lib/queue-store";
 import { cn } from "@/lib/utils";
@@ -89,9 +79,7 @@ function prefetchAdminRoute(to: string, selected: string) {
         month: "2-digit",
         day: "2-digit",
       }).format(new Date());
-      prefetchClinicalData(
-        `/admin/analytics?clinicId=${clinic}&from=${todayStr}&to=${todayStr}&status=`,
-      );
+      prefetchClinicalData(`/admin/analytics?clinicId=${clinic}&from=${todayStr}&to=${todayStr}&status=`);
       break;
     }
   }
@@ -218,9 +206,7 @@ function AdminLayoutContent() {
             </button>
             <Logo className="hidden shrink-0 sm:flex lg:hidden" />
             <div className="hidden min-w-0 shrink-0 text-sm lg:block">
-              <span className="font-medium">
-                {selected === "all" ? "All Clinics" : clinic.name}
-              </span>
+              <span className="font-medium">{selected === "all" ? "All Clinics" : clinic.name}</span>
               <span className="ml-3 text-muted-foreground">{date}</span>
             </div>
             <div className="min-w-0 flex-1 max-w-[10.5rem] sm:max-w-[13rem]">
@@ -309,8 +295,7 @@ function AdminLayoutContent() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure you want to sign out?</AlertDialogTitle>
             <AlertDialogDescription>
-              Any unsaved changes in an open form will be lost. You will need to sign in again to
-              access the admin dashboard.
+              Any unsaved changes in an open form will be lost. You will need to sign in again to access the admin dashboard.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

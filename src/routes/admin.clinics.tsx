@@ -6,8 +6,11 @@ import { useState } from "react";
 import { api } from "@/api/client";
 import { useAuth } from "@/providers/auth-provider";
 import { useClinicContext } from "@/providers/clinic-provider";
-import { ClinicalLoading, invalidateClinicalCache, useClinicalData } from "@/components/clinical";
-import { AppLink } from "@/components/app-link";
+import {
+  ClinicalLoading,
+  invalidateClinicalCache,
+  useClinicalData,
+} from "@/components/clinical";
 import { PageHeader, Btn, Field } from "@/components/qc";
 import { friendlyError } from "@/services/errors";
 import { DEFAULT_CITIES } from "@/domain/cities";
@@ -25,7 +28,6 @@ export function Clinics() {
     [busy, setBusy] = useState(false),
     [fixedCity, setFixedCity] = useState(false),
     [city, setCity] = useState(""),
-    [area, setArea] = useState(""),
     [created, setCreated] = useState<ManagedClinic | null>(null);
 
   const reloadClinics = () => {
@@ -48,7 +50,6 @@ export function Clinics() {
         method: editing ? "PUT" : "POST",
         body: {
           city,
-          area: area.trim() || undefined,
           name: value("name"),
           publicName: editing?.publicDisplayName ?? value("name"),
           address: value("address"),
@@ -79,14 +80,6 @@ export function Clinics() {
         .map((name) => [normalizeLocation(name), name]),
     ).values(),
   ].sort((a, b) => a.localeCompare(b));
-  const areaOptions = [
-    ...new Set(
-      clinics
-        .filter((c) => normalizeLocation(c.city || "") === normalizeLocation(city))
-        .map((c) => c.area || "")
-        .filter(Boolean),
-    ),
-  ].sort((a, b) => a.localeCompare(b));
   return (
     <>
       <PageHeader
@@ -99,7 +92,6 @@ export function Clinics() {
                 setFixedCity(false);
                 setEditing(null);
                 setCity("");
-                setArea("");
                 setCreated(null);
               }}
             >
@@ -112,15 +104,14 @@ export function Clinics() {
         <div className="surface mb-6 p-5">
           <p className="font-medium">Clinic created.</p>
           <p className="mt-2 text-sm text-muted-foreground">
-            Appointment slots automatically follow {created.name}'s opening and closing hours (
-            {created.openingTime} – {created.closingTime}).
+            Appointment slots automatically follow {created.name}'s opening and closing hours ({created.openingTime} – {created.closingTime}).
           </p>
-          <AppLink
+          <a
             className="mt-4 inline-block text-sm font-medium text-primary hover:underline"
             href="/admin/appointments"
           >
             View appointments →
-          </AppLink>
+          </a>
         </div>
       )}
       {error && (
@@ -145,14 +136,6 @@ export function Clinics() {
                 }}
               />
             )}
-            <SearchableChoice
-              label="Area"
-              value={area}
-              allowCreate
-              options={areaOptions}
-              disabled={!city}
-              onChange={(v) => setArea(v)}
-            />
             <Field
               label="Clinic name *"
               name="name"
@@ -209,9 +192,7 @@ export function Clinics() {
             </label>
           </div>
           <p className="text-xs text-muted-foreground">
-            Appointment booking slots and doctor hours automatically follow the clinic's opening and
-            closing times. Deactivating stops new tokens and queue openings while preserving
-            existing records.
+            Appointment booking slots and doctor hours automatically follow the clinic's opening and closing times. Deactivating stops new tokens and queue openings while preserving existing records.
           </p>
           <div className="flex gap-3">
             <Btn disabled={busy}>{busy ? "Saving…" : "Save clinic"}</Btn>
@@ -239,28 +220,11 @@ export function Clinics() {
             <section key={normalizeLocation(g.city)} className="space-y-4 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold">{g.city}</h2>
-                <Btn
-                  variant="secondary"
-                  onClick={() => {
-                    setFixedCity(true);
-                    setCity(g.city);
-                    setArea("");
-                    setEditing(null);
-                    setCreated(null);
-                  }}
-                >
-                  + Add Area
-                </Btn>
               </div>
               {g.areas.map((a) => (
-                <section
-                  key={normalizeLocation(a.area)}
-                  className="divide-y divide-border overflow-hidden rounded-lg border border-border"
-                >
+                <section key={normalizeLocation(a.area)} className="rounded-lg border border-border">
                   {a.area !== "Area not yet specified" && (
-                    <h3 className="bg-muted/25 px-5 py-3 text-sm font-semibold text-foreground">
-                      {a.area}
-                    </h3>
+                    <h3 className="px-5 pt-4 font-medium">{a.area}</h3>
                   )}
                   {a.clinics.map((c) => (
                     <article key={c.id} className="p-5">
@@ -289,7 +253,6 @@ export function Clinics() {
                             setFixedCity(false);
                             setEditing(c);
                             setCity(c.city || "");
-                            setArea(c.area || "");
                             setCreated(null);
                           }}
                         >
@@ -316,9 +279,7 @@ export function Clinics() {
                             description="Existing records will be preserved. This clinic will no longer accept bookings or queue actions."
                             confirm="Archive clinic"
                             onConfirm={() =>
-                              void api("/admin/clinics/" + c.id + "?archive=1", {
-                                method: "DELETE",
-                              })
+                              void api("/admin/clinics/" + c.id + "?archive=1", { method: "DELETE" })
                                 .then(() => {
                                   reloadClinics();
                                   window.dispatchEvent(new Event("queuecare:refresh"));

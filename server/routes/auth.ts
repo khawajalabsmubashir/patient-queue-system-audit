@@ -117,10 +117,8 @@ export function authRoutes(db: Database) {
       now = Date.now(),
       priorIp = attempts.get(ipKey),
       priorAcct = attempts.get(acctKey);
-    const ipState =
-      priorIp && priorIp.until > now ? priorIp : { count: 0, until: now + LOCK_WINDOW_MS };
-    const acctState =
-      priorAcct && priorAcct.until > now ? priorAcct : { count: 0, until: now + LOCK_WINDOW_MS };
+    const ipState = priorIp && priorIp.until > now ? priorIp : { count: 0, until: now + LOCK_WINDOW_MS };
+    const acctState = priorAcct && priorAcct.until > now ? priorAcct : { count: 0, until: now + LOCK_WINDOW_MS };
 
     if (acctState.count >= MAX_FAILED_LOGIN_ATTEMPTS || ipState.count >= MAX_IP_LOGIN_ATTEMPTS)
       throw new ApiError(

@@ -40,11 +40,7 @@ export class SupabaseDocumentStorage implements DocumentStorage {
     const r = await this.request("object/authenticated/" + medicalBucket + "/" + path);
     const size = Number(r.headers.get("content-length"));
     if (size > maxBytes)
-      throw new ApiError(
-        400,
-        "FILE_TOO_LARGE",
-        `Files must be no larger than ${Math.round(maxBytes / 1048576)} MB.`,
-      );
+      throw new ApiError(400, "FILE_TOO_LARGE", `Files must be no larger than ${Math.round(maxBytes / 1048576)} MB.`);
     return new Uint8Array(await r.arrayBuffer());
   }
   async signedUrl(path: string) {
@@ -71,11 +67,7 @@ export function validateFileName(filename: string, mime: string) {
     "image/jpeg": /\.jpe?g$/i,
     "image/png": /\.png$/i,
   };
-  if (
-    [...filename].some((c) => c.charCodeAt(0) < 32) ||
-    /[\\/]/.test(filename) ||
-    !extensions[mime]?.test(filename)
-  )
+  if (/[\\/\x00-\x1f]/.test(filename) || !extensions[mime]?.test(filename))
     throw new ApiError(
       400,
       "INVALID_FILE",
