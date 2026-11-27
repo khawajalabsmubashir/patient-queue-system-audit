@@ -205,86 +205,120 @@ export function NotificationCenter() {
 
   const unreadCount = items.filter((n) => !n.read_at).length;
 
-  const panelBody = (
+    const panelBody = (
     <>
-      <div className="shrink-0 border-b border-border px-4 pb-3 pt-3.5">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <h2 className="truncate font-semibold text-foreground">Notifications</h2>
-            {unreadCount > 0 && (
-              <span className="shrink-0 whitespace-nowrap rounded-md bg-primary-soft px-1.5 py-0.5 text-[11px] font-semibold text-primary tabular">
-                {unreadCount} new
-              </span>
-            )}
-          </div>
-          <div className="flex shrink-0 items-center gap-1">
-            <Btn
-              variant="ghost"
-              className="h-8 shrink-0 whitespace-nowrap px-2.5 text-xs"
-              onClick={() => void read()}
-            >
-              Mark all read
-            </Btn>
-            <button
-              type="button"
-              aria-label="Close notifications"
-              onClick={() => setOpen(false)}
-              className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <X className="size-4" aria-hidden="true" />
-            </button>
-          </div>
+      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+        <div className="flex items-center gap-2">
+          <h2 className="text-sm font-bold text-foreground">Notifications</h2>
+          {unreadCount > 0 && (
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+              {unreadCount} new
+            </span>
+          )}
         </div>
-
-        <div
-          role="tablist"
-          aria-label="Filter notifications by date"
-          className="inline-flex w-full items-center gap-1 rounded-lg bg-muted/60 p-1"
-        >
-          {(
-            [
-              ["all", "All"],
-              ["today", "Today"],
-              ["yesterday", "Yesterday"],
-            ] as const
-          ).map(([key, label]) => (
-            <button
-              key={key}
-              type="button"
-              role="tab"
-              aria-selected={filter === key}
-              onClick={() => setFilter(key)}
-              className={`flex-1 rounded-md px-2.5 py-1 text-xs font-medium transition ${
-                filter === key
-                  ? "bg-card text-foreground shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {label}
-            </button>
-          ))}
+        <div className="flex items-center gap-1">
+          <Btn
+            variant="ghost"
+            className="h-8 shrink-0 whitespace-nowrap px-2.5 text-xs"
+            onClick={() => void read()}
+          >
+            Mark all read
+          </Btn>
+          <button
+            type="button"
+            aria-label="Close notifications"
+            onClick={() => setOpen(false)}
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
         </div>
       </div>
-
-      <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3 pr-2.5">
+      <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
         {error && (
           <p role="alert" className="mb-2 text-sm text-destructive">
             {error}
           </p>
         )}
+        <div className="space-y-2">
+          {items.map((n) => {
+            const meta = notificationMeta(n);
+            const Icon = meta.Icon;
+            const unread = !n.read_at;
+            return (
+              <article
+                key={n.id}
+                className={
+                  "rounded-xl border px-3.5 py-3 transition " +
+                  (unread
+                    ? "border-primary/30 bg-primary/5"
+                    : "border-border/60 bg-card hover:bg-muted/40")
+                }
+              >
+                <div className="flex items-start gap-3">
+                  <div
+                    className={"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg " + meta.iconCls}
+                  >
+                    <Icon className="size-4" aria-hidden="true" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <a
+                      href={notificationHref(n, profile?.role ?? "patient")}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        setOpen(false);
+                        void read(n.id).then(() =>
+                          window.location.assign(
+                            notificationHref(n, profile?.role ?? "patient"),
+                          ),
+                        );
+                      }}
+                      className="block"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-1.5">
+                        <span
+                          className={"inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold " + meta.badgeCls}
+                        >
+                          {meta.label}
+                        </span>
+                        <time
+                          dateTime={n.created_at}
+                          title={formatFullDateTimeTooltip(n.created_at)}
+                          className="tabular-nums text-[11px] text-muted-foreground"
+                        >
+                          {formatDateTime(n.created_at)}
+                        </time>
+                      </div>
+                      <p className="mt-1 text-sm font-medium text-foreground">{n.title}</p>
+                      <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
+                        {n.message}
+                      </p>
+                    </a>
+                    {unread && (
+                      <button
+                        type="button"
+                        className="mt-1.5 text-xs font-medium text-primary hover:underline"
+                        onClick={() => void read(n.id)}
+                      >
+                        Mark read
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+        {!items.length && !error && (
+          <p className="py-8 text-center text-sm text-muted-foreground">
+            You’re all caught up.
+          </p>
+        )}
+      </div>
+    </>
+  );
 
-        <div className="space-y-4">
-          {grouped.map((group) => (
-            <section key={group.key} aria-label={group.label}>
-              <h3 className="mb-1.5 px-1 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                {group.label}
-              </h3>
-              <div className="space-y-2">
-                {group.list.map((n) => {
-                  const meta = notificationMeta(n);
-                  const Icon = meta.Icon;
-                  const unread = !n.read_at;
-                  return (
+  return (
                     <article
                       key={n.id}
                       className={

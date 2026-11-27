@@ -337,13 +337,10 @@ function UnifiedTokenQueueCard() {
         <h2 className="text-base font-bold text-foreground sm:text-lg">
           {headerDate} &bull; {headerClinic}
         </h2>
-        <Link
-          to="/patient/live-queue"
-          className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/25 bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary/15"
-        >
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/25 bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary">
           {open && <LiveDot />}
           <span>Live queue</span>
-        </Link>
+        </span>
       </div>
 
       {/* Unified 2-Column Content */}
@@ -654,13 +651,7 @@ function HistoryMyVisitsCard() {
                 {selectedVisit.prescription.items.length > 0
                   ? `${selectedVisit.prescription.items.length} prescribed item(s) · `
                   : ""}
-                <Link
-                  to="/patient/visit/$visitId"
-                  params={{ visitId: selectedVisit.id }}
-                  className="font-medium text-primary hover:underline"
-                >
-                  View visit summary
-                </Link>
+                
               </p>
             </div>
           </div>

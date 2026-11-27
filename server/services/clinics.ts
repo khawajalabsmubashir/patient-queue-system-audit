@@ -87,7 +87,7 @@ const clinicSchema = z
     showNext: z.boolean(),
     avgMin: z.number().int().min(1).max(120).optional(),
     active: z.boolean(),
-    consultationFee: z.number().int().min(0).max(10000000).nullable(),
+    consultationFee: z.coerce.number().int().min(0).max(10000000).nullable().optional(),
   })
   .strict()
   .refine((c) => c.opening < c.closing, { message: "Closing time must be after opening time." });
@@ -165,7 +165,7 @@ export async function saveClinic(
       );
     const doctor = await one<{ id: string }>(
       db,
-      "SELECT id FROM users WHERE role='admin' ORDER BY created_at,id LIMIT 1",
+      "SELECT id FROM users WHERE role IN ('admin', 'doctor') ORDER BY created_at,id LIMIT 1",
     );
     if (doctor) {
       await db

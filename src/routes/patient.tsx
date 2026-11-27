@@ -72,75 +72,62 @@ type HelpTopic = "contact" | "faqs" | "privacy" | "terms";
 function PatientFooter() {
   const { clinics, selected } = useClinicContext();
   const activeClinic = clinics.find((c) => c.id === selected) ?? clinics[0];
-  const branding = useClinicalData<PrintBrandingData>(
-    selected ? "/branding?clinicId=" + encodeURIComponent(selected) : null,
-  );
   const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
 
-  const brandName = branding.data?.clinic?.display_name || "Neuro Spine Care Center";
-  const clinicName = activeClinic?.name || brandName;
-  const clinicAddress = activeClinic?.address || "";
-  const clinicPhone = activeClinic?.phone || branding.data?.doctor?.phone || "";
-  const clinicEmail = branding.data?.clinic?.email || branding.data?.doctor?.email || "";
-  const opening = formatFooterTime(activeClinic?.openingTime) || "9:00 AM";
-  const closing = formatFooterTime(activeClinic?.closingTime) || "5:00 PM";
-  const locationParts = [activeClinic?.area, activeClinic?.city].filter(Boolean).join(", ");
-  const addressDisplay =
-    [clinicAddress, locationParts].filter(Boolean).join(", ") || "Clinic address at reception";
-  const mapsQuery = encodeURIComponent([clinicName, clinicAddress, locationParts].filter(Boolean).join(", "));
-  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+  const clinicName = activeClinic?.name || "Neuro Medical Clinic";
+  const clinicAddress = activeClinic?.address || "Ground Floor, Mall Road (Opposite State Life Building, Adjacent to Bank Alfalah), Saddar, Rawalpindi, 46000";
+  const clinicPhone = activeClinic?.phone || "+92 304 540 5530";
+  const clinicEmail = "clinicneurology4@gmail.com";
+  const mapsQuery = encodeURIComponent([clinicName, clinicAddress].filter(Boolean).join(", "));
+  const directionsUrl = activeClinic?.id === "northstar" || !activeClinic?.address 
+    ? "https://www.google.com/maps/place/Dr.+Umar+Zafar+%7C+Neuro+Medical+Clinic/@33.5954252,73.0497297,17z/data=!4m7!3m6!1s0x38df958b4b5b0c57:0xd7b883c9ed34ae9b!8m2!3d33.5954252!4d73.0497297!10e1!16s%2Fg%2F11h80p7mjy?entry=ttu"
+    : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
   return (
     <>
       <footer className="mt-14 bg-[#0d4633] text-emerald-50/90 print:hidden">
-        <div className="mx-auto max-w-6xl px-5 py-11">
-          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.35fr_1fr_1fr_1fr]">
-            {/* Column 1: Clinic Identity & Directions */}
+        <div className="mx-auto max-w-6xl px-5 py-10">
+          <div className="grid gap-8 sm:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr]">
+            {/* Column 1: Clinic Contact Info */}
             <div className="min-w-0 space-y-2.5 text-sm">
               <div className="flex items-center gap-2.5">
-                <div className="grid size-7 shrink-0 place-items-center rounded-md bg-white text-[#0d4633]">
-                  <svg
-                    viewBox="0 0 24 24"
-                    className="size-4"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.6"
-                    strokeLinecap="round"
-                  >
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                </div>
-                <span className="text-[15px] font-semibold tracking-tight text-white">
-                  {brandName}
+                <span className="text-[15px] font-bold tracking-tight text-white">
+                  {clinicName}
                 </span>
               </div>
-
               <div className="space-y-1 pt-1 text-xs leading-relaxed text-emerald-100/80">
-                {clinicName !== brandName && <p className="font-medium text-white">{clinicName}</p>}
-                <p className="break-words">{addressDisplay}</p>
-                {clinicPhone && (
-                  <p>
-                    <a
-                      href={`tel:${clinicPhone.replace(/[^+\d]/g, "")}`}
-                      className="tabular-nums hover:text-white hover:underline"
-                    >
-                      {clinicPhone}
-                    </a>
-                  </p>
-                )}
-                <p className="tabular-nums">
-                  Today · {opening} – {closing}
+                <p className="font-medium text-emerald-200">Dr. Umar Zafar Ali — Consultant Neurophysician &amp; Neurologist (MBBS, FCPS Neurology)</p>
+                <p className="break-words">Consultation Fee: PKR 1,000</p>
+                <p className="break-words">{clinicAddress}</p>
+                <p className="space-x-3">
+                  <span>Mobile: <a href="tel:+923045405530" className="hover:text-white hover:underline">+92 304 540 5530</a></span>
+                </p>
+                <p className="space-x-3">
+                  <span>WhatsApp: <a href="https://wa.me/923333311042" target="_blank" rel="noreferrer" className="hover:text-white hover:underline">+92 333 331 1042</a></span>
+                </p>
+                <p>
+                  Landline: <a href="tel:0516128100" className="hover:text-white hover:underline">(051) 6128100</a>
+                </p>
+                <p>
+                  Email: <a href="mailto:clinicneurology4@gmail.com" className="hover:text-white hover:underline">clinicneurology4@gmail.com</a>
                 </p>
               </div>
-
-              <p className="pt-1">
+              <p className="pt-1 flex flex-wrap gap-4 text-xs font-medium">
                 <a
-                  href={directionsUrl}
+                  href="https://www.google.com/maps/place/Dr.+Umar+Zafar+%7C+Neuro+Medical+Clinic/@33.5954252,73.0497297,17z/data=!4m7!3m6!1s0x38df958b4b5b0c57:0xd7b883c9ed34ae9b!8m2!3d33.5954252!4d73.0497297!10e1!16s%2Fg%2F11h80p7mjy?entry=ttu"
                   target="_blank"
                   rel="noreferrer"
-                  className="text-xs font-medium text-emerald-200 underline-offset-4 hover:text-white hover:underline"
+                  className="text-emerald-200 underline-offset-4 hover:text-white hover:underline"
                 >
-                  Get directions
+                  Google Maps Directions Link
+                </a>
+                <a
+                  href="https://www.google.com/maps/place/Dr.+Umar+Zafar+%7C+Neuro+Medical+Clinic/@33.5954252,73.0497297,17z"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-emerald-200 underline-offset-4 hover:text-white hover:underline"
+                >
+                  Dr. Umar Zafar Contact Page
                 </a>
               </p>
             </div>
@@ -148,201 +135,66 @@ function PatientFooter() {
             {/* Column 2: Quick Links */}
             <div className="min-w-0 space-y-3">
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-200/75">
-                Quick links
+                Quick Links
               </h2>
-              <ul className="space-y-2 text-xs text-emerald-100/85">
+              <ul className="space-y-2 text-xs">
                 <li>
-                  <Link
-                    to="/patient/appointments"
-                    search={{ book: "1" } as never}
-                    className="hover:text-white hover:underline"
-                  >
-                    Book appointment
+                  <Link to="/patient/dashboard" className="text-emerald-100/80 hover:text-white">
+                    Patient Home
                   </Link>
                 </li>
                 <li>
-                  <Link to="/patient/live-queue" className="hover:text-white hover:underline">
-                    Live queue
+                  <Link to="/patient/appointments" className="text-emerald-100/80 hover:text-white">
+                    Appointments &amp; Booking
                   </Link>
                 </li>
                 <li>
-                  <Link to="/patient/appointments" className="hover:text-white hover:underline">
-                    My appointments
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/patient/profile" className="hover:text-white hover:underline">
+                  <Link to="/patient/profile" className="text-emerald-100/80 hover:text-white">
                     Profile &amp; Account
                   </Link>
                 </li>
               </ul>
             </div>
 
-            {/* Column 3: My Records */}
+            {/* Column 3: Support & Legal */}
             <div className="min-w-0 space-y-3">
               <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-200/75">
-                My records
+                Support &amp; Legal
               </h2>
-              <ul className="space-y-2 text-xs text-emerald-100/85">
-                <li>
-                  <Link to="/patient/visits" className="hover:text-white hover:underline">
-                    My visits
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/patient/prescriptions" className="hover:text-white hover:underline">
-                    Prescriptions
-                  </Link>
-                </li>
-                <li>
-                  <Link to="/patient/documents" className="hover:text-white hover:underline">
-                    Medical documents
-                  </Link>
-                </li>
-              </ul>
-            </div>
-
-            {/* Column 4: Help */}
-            <div className="min-w-0 space-y-3">
-              <h2 className="text-[11px] font-semibold uppercase tracking-[0.1em] text-emerald-200/75">
-                Help
-              </h2>
-              <ul className="space-y-2 text-xs text-emerald-100/85">
-                <li>
-                  <button
-                    type="button"
-                    onClick={() => setHelpTopic("contact")}
-                    className="text-left hover:text-white hover:underline"
-                  >
-                    Contact clinic
-                  </button>
-                </li>
+              <ul className="space-y-2 text-xs">
                 <li>
                   <button
                     type="button"
                     onClick={() => setHelpTopic("faqs")}
-                    className="text-left hover:text-white hover:underline"
+                    className="text-emerald-100/80 hover:text-white"
                   >
-                    FAQs
+                    Help &amp; FAQs
                   </button>
                 </li>
                 <li>
                   <button
                     type="button"
                     onClick={() => setHelpTopic("privacy")}
-                    className="text-left hover:text-white hover:underline"
+                    className="text-emerald-100/80 hover:text-white"
                   >
-                    Privacy policy
+                    Privacy Policy
                   </button>
                 </li>
                 <li>
                   <button
                     type="button"
                     onClick={() => setHelpTopic("terms")}
-                    className="text-left hover:text-white hover:underline"
+                    className="text-emerald-100/80 hover:text-white"
                   >
-                    Terms of use
+                    Terms of Use
                   </button>
                 </li>
               </ul>
             </div>
           </div>
-
-          <div className="mt-9 flex flex-col justify-between gap-2 border-t border-white/15 pt-5 text-xs text-emerald-200/70 sm:flex-row sm:items-center">
-            <p>
-              &copy; {new Date().getFullYear()} {clinicName}. All rights reserved.
-            </p>
-            <p>All clinic times shown in Asia/Karachi (PKT)</p>
-          </div>
         </div>
       </footer>
 
-      <Dialog open={helpTopic !== null} onOpenChange={(open) => !open && setHelpTopic(null)}>
-        <DialogContent className="max-w-md">
-          <DialogTitle>
-            {helpTopic === "contact"
-              ? "Contact clinic"
-              : helpTopic === "faqs"
-                ? "Patient FAQs"
-                : helpTopic === "privacy"
-                  ? "Privacy policy"
-                  : "Terms of use"}
-          </DialogTitle>
-          <DialogDescription>
-            {helpTopic === "contact"
-              ? `Reach ${clinicName} reception during clinic hours.`
-              : helpTopic === "faqs"
-                ? "Helpful answers about appointments, queue tokens, and visits."
-                : helpTopic === "privacy"
-                  ? "How your clinical records and appointment details are safeguarded."
-                  : "Guidelines for booking appointments and using the patient queue portal."}
-          </DialogDescription>
-          <div className="space-y-3 text-sm text-muted-foreground">
-            {helpTopic === "contact" && (
-              <>
-                <p>
-                  <strong className="text-foreground">Clinic:</strong> {clinicName}
-                </p>
-                <p>
-                  <strong className="text-foreground">Address:</strong> {addressDisplay}
-                </p>
-                {clinicPhone && (
-                  <p>
-                    <strong className="text-foreground">Phone:</strong>{" "}
-                    <a
-                      href={`tel:${clinicPhone.replace(/[^+\d]/g, "")}`}
-                      className="text-primary hover:underline"
-                    >
-                      {clinicPhone}
-                    </a>
-                  </p>
-                )}
-                {clinicEmail && (
-                  <p>
-                    <strong className="text-foreground">Email:</strong>{" "}
-                    <a href={`mailto:${clinicEmail}`} className="text-primary hover:underline">
-                      {clinicEmail}
-                    </a>
-                  </p>
-                )}
-                <p>
-                  <strong className="text-foreground">Hours:</strong> {opening} – {closing}
-                </p>
-              </>
-            )}
-            {helpTopic === "faqs" && (
-              <ul className="list-disc space-y-2 pl-5">
-                <li>
-                  Your token becomes active in the live queue on the day of your appointment.
-                </li>
-                <li>
-                  Arrive at the waiting room when 3 patients remain ahead of your token.
-                </li>
-                <li>
-                  To cancel an upcoming slot, open your appointment in Appointments and manage its token.
-                </li>
-              </ul>
-            )}
-            {helpTopic === "privacy" && (
-              <p>
-                Appointment bookings, prescriptions, and visit summaries are visible only to you and
-                authorized clinic care staff. Never share your account password or active session
-                links.
-              </p>
-            )}
-            {helpTopic === "terms" && (
-              <p>
-                Please arrive on time when your token approaches the front of the queue. For
-                medical emergencies, contact emergency services or visit the nearest emergency
-                department immediately.
-              </p>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
-    </>
-  );
-}
 
 function PatientLayout() {
   return (

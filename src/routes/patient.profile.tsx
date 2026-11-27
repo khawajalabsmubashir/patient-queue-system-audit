@@ -158,26 +158,7 @@ function Profile() {
 
       <AccountSecurityPanel embedded />
 
-      <section className="surface p-5 sm:p-7">
-        <h2 className="text-lg font-semibold text-foreground">Doctor-recorded information</h2>
-        <p className="mt-1.5 text-sm text-muted-foreground">
-          Contact your clinic to correct clinical information.
-        </p>
-        <dl className="mt-5 grid gap-5 sm:grid-cols-3">
-          {[
-            ["Allergies", p.allergies],
-            ["Chronic conditions", p.chronicConditions],
-            ["Current medications", p.currentMedications],
-          ].map(([label, value]) => (
-            <div key={label}>
-              <dt className="text-sm font-medium text-foreground">{label}</dt>
-              <dd className="mt-1.5 whitespace-pre-wrap text-sm text-muted-foreground">
-                {value || "None recorded"}
-              </dd>
-            </div>
-          ))}
-        </dl>
-      </section>
+      
     </div>
   );
 }
