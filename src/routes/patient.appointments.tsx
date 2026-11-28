@@ -231,7 +231,7 @@ export function Appointments() {
         right={
           <Btn onClick={openBookingModal} className="w-full font-semibold sm:w-auto">
             <Plus className="size-4" aria-hidden="true" />
-            <span>+ Book Appointment</span>
+            <span>Book Appointment</span>
           </Btn>
         }
       />

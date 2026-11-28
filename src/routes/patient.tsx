@@ -88,9 +88,9 @@ function PatientFooter() {
               </div>
               <div className="space-y-1 pt-1 text-xs leading-relaxed text-emerald-100/80">
                 <p className="font-medium text-emerald-200">
-                  Dr. Umar Zafar Ali — Consultant Neurophysician &amp; Neurologist (MBBS, FCPS Neurology)
+                  Dr. Umar Zafar Ali — Neurophysician &amp; Neurologist (MBBS, FCPS Neurology)
                 </p>
-                <p className="break-words">Consultation Fee: PKR 1,000</p>
+                
                 <p className="break-words">{clinicAddress}</p>
                 <p className="space-x-3">
                   <span>
@@ -116,12 +116,7 @@ function PatientFooter() {
                     </a>
                   </span>
                 </p>
-                <p>
-                  Landline:{" "}
-                  <a href="tel:0516128100" className="hover:text-white hover:underline">
-                    (051) 6128100
-                  </a>
-                </p>
+                
                 <p>
                   Email:{" "}
                   <a href={`mailto:${clinicEmail}`} className="hover:text-white hover:underline">
