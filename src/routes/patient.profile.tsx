@@ -1,7 +1,7 @@
 import { usePatientToday } from "@/hooks/use-patient-today";
 import { SelectField } from "@/components/form-controls";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
 import { api } from "@/api/client";
 import { restoreSession } from "@/services/auth";
 import { PageHeader, Btn, Field } from "@/components/qc";
@@ -35,7 +35,7 @@ function Profile() {
     [message, setMessage] = useState("");
   if (!remote.data) return <ClinicalLoading error={remote.error} retry={remote.reload} />;
   const p = remote.data;
-  const save = async (e: React.FormEvent<HTMLFormElement>) => {
+  const save = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const f = new FormData(e.currentTarget),
       value = (k: string) => String(f.get(k) ?? "");

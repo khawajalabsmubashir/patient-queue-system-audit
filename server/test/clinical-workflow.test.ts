@@ -4,7 +4,6 @@ import { once } from "node:events";
 import { createLocalApp } from "../app.ts";
 import { createPostgresDatabase } from "../db/postgres.ts";
 import { testDoctorHours } from "./availability-fixture.ts";
-import { one } from "../db/database.ts";
 import type { DocumentStorage } from "../services/document-storage.ts";
 test(
   "Clinical additions: notes, owned private uploads, verified bytes, clinic library and immutable structured prescriptions",

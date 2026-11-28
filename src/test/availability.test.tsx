@@ -72,7 +72,7 @@ it("slot picker clears selection when date changes and shows no availability", a
 });
 
 it("clinics creation informs admin that booking follows clinic opening and closing hours automatically", async () => {
-  fixture.api.mockImplementation((path: string, opts?: { method?: string }) => {
+  fixture.api.mockImplementation((_path: string, opts?: { method?: string }) => {
     if (opts?.method === "POST") {
       return Promise.resolve({
         id: "new-clinic",

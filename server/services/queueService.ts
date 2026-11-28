@@ -1,5 +1,5 @@
 import { withAppointmentAttention } from "./appointment-attention.ts";
-import { authorizeClinic, audit, notification, operationalNotification } from "./operations.ts";
+import { authorizeClinic, audit, notification } from "./operations.ts";
 import type { Database } from "../db/database.ts";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";

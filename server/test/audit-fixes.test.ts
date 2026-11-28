@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { once } from "node:events";
 import { createLocalApp } from "../app.ts";
 import { testDoctorHours } from "./availability-fixture.ts";
-import { clinicDayKey } from "../../src/domain/queue.js";
 
 test("audit fixes: backend validation rejects oversized/SQL/script inputs and >5MB appointment upload prep", async () => {
   const app = createLocalApp({ log: () => {} });

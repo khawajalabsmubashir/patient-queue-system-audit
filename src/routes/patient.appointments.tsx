@@ -1,6 +1,6 @@
 import { useEffect, useId, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { ChevronRight, Download, FileText, Plus } from "lucide-react";
+import { ChevronRight, Download, Plus } from "lucide-react";
 import {
   AttachmentFields,
   uploadAppointmentFiles,

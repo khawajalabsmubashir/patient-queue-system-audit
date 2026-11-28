@@ -12,7 +12,6 @@ import { useClinicalData, ClinicalLoading } from "@/components/clinical";
 import { NotificationCenter } from "@/components/notification-center";
 import { BillingWorkspace } from "@/components/billing-workspace";
 import { DocumentsPanel } from "@/components/documents-panel";
-import { PatientPicker } from "@/components/patient-picker";
 import { logout } from "@/services/auth";
 import { runAction } from "@/services/queue";
 import {
@@ -62,7 +61,6 @@ function Workspace() {
     [prep, setPrep] = useState<string | null>(null),
     [prepPatientId, setPrepPatientId] = useState<string | null>(null),
     [patient, setPatient] = useState<string | null>(null),
-    [editingAppointment, setEditingAppointment] = useState<Appointment | null>(null),
     [lookup, setLookup] = useState<{ id: string; name: string } | null>(null),
     [confirmLogout, setConfirmLogout] = useState(false);
   const nurse = profile?.role === "nurse";
@@ -78,7 +76,6 @@ function Workspace() {
   useEffect(() => {
     setPrep(null);
     setPatient(null);
-    setEditingAppointment(null);
     setLookup(null);
     setPrepPatientId(null);
   }, [selected]);

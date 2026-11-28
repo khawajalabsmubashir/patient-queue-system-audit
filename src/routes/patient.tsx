@@ -6,8 +6,9 @@ import { logout } from "@/services/auth";
 import { runAction } from "@/services/queue";
 import { createFileRoute, Link, Outlet, useLocation } from "@tanstack/react-router";
 import { LogOut, ShieldCheck } from "lucide-react";
-import { Notifications, QueueBoundary } from "@/components/queue-feedback";
-import { prefetchClinicalData, useClinicalData } from "@/components/clinical";
+import { NotificationCenter } from "@/components/notification-center";
+import { QueueBoundary } from "@/components/queue-feedback";
+import { prefetchClinicalData } from "@/components/clinical";
 import { Logo } from "@/components/qc";
 import {
   DropdownMenu,
@@ -33,7 +34,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import type { PrintBrandingData } from "@/types/clinical-workflow";
 
 export const Route = createFileRoute("/patient")({ component: PatientLayout });
 
@@ -52,13 +52,6 @@ function initialsOf(name?: string) {
     : (parts[0]![0]! + parts[parts.length - 1]![0]!).toUpperCase();
 }
 
-function formatFooterTime(value?: string) {
-  if (!value || !value.includes(":")) return "";
-  const [hour, minute] = value.split(":");
-  const h = Number(hour);
-  if (Number.isNaN(h)) return value;
-  return `${h % 12 || 12}:${minute} ${h >= 12 ? "PM" : "AM"}`;
-}
 
 type HelpTopic = "contact" | "faqs" | "privacy" | "terms";
 
@@ -343,7 +336,7 @@ function PatientLayoutContent() {
                 <ClinicSwitcher />
               </div>
 
-              <Notifications role="patient" />
+              <NotificationCenter />
 
               <DropdownMenu modal={false}>
                 <DropdownMenuTrigger asChild>

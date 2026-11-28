@@ -3,13 +3,12 @@ import { rememberSlot } from "../services/availability.ts";
 import { deliverEmails } from "../services/email.ts";
 import { Router } from "express";
 import { z } from "zod";
-import { randomUUID, createHash } from "node:crypto";
+import { createHash } from "node:crypto";
 import { compare, hash } from "bcryptjs";
 import { atomic, one, many, type Database, type UserRow } from "../db/database.ts";
 import { ApiError, requireRole, sessionCookie, publicUser } from "../middleware/auth.ts";
 import { audit, authorizeClinic, notification, idValue, stamp } from "../services/operations.ts";
 import { createAppointment, appointments } from "../services/clinics.ts";
-import { mutateQueue } from "../services/queueService.ts";
 import {
   type DataRow,
   csv,
