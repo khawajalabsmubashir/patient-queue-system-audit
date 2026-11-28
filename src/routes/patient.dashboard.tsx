@@ -332,13 +332,13 @@ function UnifiedTokenQueueCard() {
       aria-label="Live queue status"
       className="surface overflow-hidden"
     >
-      {/* Card Top Header: Day, Date & Clinic Name + Live queue link in top-right corner */}
+      {/* Card Top Header: Day, Date & Clinic Name + animation-only non-clickable Live queue indicator */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-card px-5 py-4 sm:px-7">
         <h2 className="text-base font-bold text-foreground sm:text-lg">
           {headerDate} &bull; {headerClinic}
         </h2>
-        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-primary/25 bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary">
-          {open && <LiveDot />}
+        <span className="pointer-events-none inline-flex shrink-0 select-none items-center gap-1.5 rounded-lg border border-primary/25 bg-primary-soft px-3 py-1.5 text-xs font-semibold text-primary">
+          <LiveDot />
           <span>Live queue</span>
         </span>
       </div>
@@ -649,7 +649,7 @@ function HistoryMyVisitsCard() {
               </h3>
               <p className="mt-1 text-xs text-muted-foreground">
                 {selectedVisit.prescription.items.length > 0
-                  ? `${selectedVisit.prescription.items.length} prescribed item(s) · `
+                  ? `${selectedVisit.prescription.items.length} prescribed item(s)`
                   : ""}
                 
               </p>
@@ -672,12 +672,7 @@ function HistoryMyVisitsCard() {
               ? visitsRemote.error
               : "No past visits yet. Completed clinic visits and prescription PDFs will appear here."}
           </p>
-          <Link
-            to="/patient/visits"
-            className="shrink-0 text-sm font-semibold text-primary hover:underline"
-          >
-            My visits →
-          </Link>
+          
         </div>
       )}
     </section>

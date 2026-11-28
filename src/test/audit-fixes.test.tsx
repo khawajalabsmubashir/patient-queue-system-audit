@@ -322,7 +322,7 @@ describe("Audit fixes verification", () => {
       },
       doctor: null,
     });
-    mocks.pathname = "/patient/visits";
+    mocks.pathname = "/patient/appointments";
     const PatientComponent = PatientRoute.options.component!;
     const { unmount } = render(<PatientComponent />);
 
@@ -338,11 +338,11 @@ describe("Audit fixes verification", () => {
     const header = document.querySelector("header")!;
     expect(within(header).queryByRole("button", { name: /^Sign Out$/i })).toBeNull();
 
-    // QueueBoundary remains omitted on non-queue visits route
+    // QueueBoundary remains omitted on non-queue appointments route
     expect(screen.queryByTestId("queue-boundary")).toBeNull();
     expect(screen.getByTestId("route-outlet")).toBeVisible();
 
-    // Footer is NOT rendered on non-Home pages (/patient/visits)
+    // Footer is NOT rendered on non-Home pages (/patient/appointments)
     expect(document.querySelector("footer")).toBeNull();
 
     // Profile dropdown includes ONLY Profile & Account and Sign Out -> confirmation prompt without scroll-lock
@@ -370,16 +370,20 @@ describe("Audit fixes verification", () => {
     expect(footer).not.toBeNull();
     expect(footer.className).toContain("bg-[#0d4633]");
     expect(footer).toHaveTextContent("Health Point");
+    expect(footer).toHaveTextContent("Dr. Umar Zafar Ali");
     expect(footer).toHaveTextContent("Plot 12, Clifton Block 5");
     expect(footer).toHaveTextContent("03001112233");
     expect(footer).toHaveTextContent(/All rights reserved/i);
-    expect(within(footer).getByRole("link", { name: /Get directions/i })).toBeVisible();
+    expect(within(footer).getByRole("link", { name: /Google Maps Directions Link/i })).toBeVisible();
     expect(within(footer).getByRole("link", { name: /Profile & Account/i })).toHaveAttribute(
       "href",
       "/patient/profile",
     );
-    fireEvent.click(within(footer).getByRole("button", { name: "FAQs" }));
-    expect(await screen.findByRole("dialog")).toHaveTextContent(/Patient FAQs/i);
+    expect(within(footer).queryByRole("link", { name: /Live queue/i })).toBeNull();
+    expect(within(footer).queryByRole("link", { name: /My visits/i })).toBeNull();
+    expect(within(footer).queryByRole("link", { name: /Prescriptions/i })).toBeNull();
+    fireEvent.click(within(footer).getByRole("button", { name: "Help & FAQs" }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent(/Help & FAQs/i);
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "Escape" });
   });
 
@@ -968,12 +972,11 @@ describe("Audit fixes verification", () => {
     expect(within(heroSection).queryByRole("link", { name: /Live queue/i })).toBeNull();
     expect(screen.queryByRole("region", { name: "Quick actions" })).toBeNull();
 
-    // Live queue link at top corner of the queue box + Token HP-001 + NO Give up token on Home
+    // Animation-only non-clickable Live queue indicator at top corner of the queue box + Token HP-001 + NO Give up token on Home
     const queueSection = screen.getByRole("region", { name: "Live queue status" });
-    expect(within(queueSection).getByRole("link", { name: /Live queue/i })).toHaveAttribute(
-      "href",
-      "/patient/live-queue",
-    );
+    expect(within(queueSection).queryByRole("link", { name: /Live queue/i })).toBeNull();
+    expect(within(queueSection).queryByRole("button", { name: /Live queue/i })).toBeNull();
+    expect(within(queueSection).getByText("Live queue")).toBeVisible();
     expect((await within(queueSection).findAllByText("HP-001")).length).toBeGreaterThanOrEqual(1);
     expect(screen.queryByRole("button", { name: /Give up token/i })).toBeNull();
 
@@ -1003,6 +1006,8 @@ describe("Audit fixes verification", () => {
     ).toHaveAttribute("href", "/api/patient/visits/visit-1/prescription-pdf");
     expect(within(historySection).queryByText(/Consultation with Dr./i)).toBeNull();
     expect(within(historySection).queryByText(/Ayesha Mahmood/i)).toBeNull();
+    expect(within(historySection).queryByRole("link", { name: /view visit summary/i })).toBeNull();
+    expect(within(historySection).queryByRole("link", { name: /My visits/i })).toBeNull();
   });
 
   it("Issue 17: Unified Profile & Account page omits Patient ID and Address, preserves Email/Phone/DOB/Gender and embeds Account Security", async () => {
@@ -1053,6 +1058,8 @@ describe("Audit fixes verification", () => {
     expect(screen.getByLabelText("Current password")).toBeVisible();
     expect(screen.getByLabelText("New password")).toBeVisible();
     expect(screen.getByLabelText("Confirm new password")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /sign out other sessions/i })).toBeNull();
+    expect(screen.queryByText(/doctor-recorded/i)).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Save Personal Details" }));
     await waitFor(() =>

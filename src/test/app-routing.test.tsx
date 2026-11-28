@@ -12,13 +12,8 @@ describe("App routing", () => {
     "/complete-profile",
     "/patient/dashboard",
     "/patient/get-token",
-    "/patient/live-queue",
     "/patient/history",
     "/patient/profile",
-    "/patient/visits",
-    "/patient/prescriptions",
-    "/patient/visit/visit-id",
-    "/patient/prescription/visit-id",
     "/admin/patient-record/patient-id",
     "/admin/visits/visit-id",
     "/admin",
@@ -45,12 +40,24 @@ describe("App routing", () => {
     "/patient/billing",
     "/public-display",
     "/patient/join-queue",
-    "/patient/queue",
     "/admin/queue",
   ])("registers %s as a page rather than not found", (path) => {
     const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
     const matches = router.matchRoutes(path);
     expect(matches.at(-1)?.routeId).not.toBe(rootRouteId);
     expect(matches.at(-1)?.pathname.replace(/\/$/, "")).toBe(path.replace(/\/$/, ""));
+  });
+
+  it.each([
+    "/patient/live-queue",
+    "/patient/queue",
+    "/patient/prescriptions",
+    "/patient/prescription/visit-id",
+    "/patient/visits",
+    "/patient/visit/visit-id",
+  ])("does not register removed patient page %s", (path) => {
+    const router = createRouter({ routeTree, context: { queryClient: new QueryClient() } });
+    const matches = router.matchRoutes(path);
+    expect(matches.at(-1)?.pathname.replace(/\/$/, "")).not.toBe(path.replace(/\/$/, ""));
   });
 });

@@ -1,3 +1,4 @@
+import { Link } from "@tanstack/react-router";
 import type { PrintBrandingData } from "@/types/clinical-workflow";
 import { SelectField } from "@/components/form-controls";
 import { AppointmentSlotPicker } from "@/components/appointment-slot-picker";
@@ -876,7 +877,7 @@ export function AccountSecurityPanel({ embedded = false }: { embedded?: boolean 
   const remote = useClinicalData<{
       profile: { fullName: string; email: string; role: string };
       googleLinked: boolean;
-      sessions: { expiresAt: number; current: boolean }[];
+      sessions?: { expiresAt: number; current: boolean }[];
     }>("/account"),
     [error, setError] = useState(""),
     [message, setMessage] = useState(""),
@@ -887,7 +888,7 @@ export function AccountSecurityPanel({ embedded = false }: { embedded?: boolean 
     setMessage("");
     try {
       await api(path, { body, method });
-      setMessage("Account security updated. Other sessions have been signed out.");
+      setMessage("Password updated successfully.");
       remote.reload();
       return true;
     } catch (e) {
@@ -905,7 +906,7 @@ export function AccountSecurityPanel({ embedded = false }: { embedded?: boolean 
         <div className="border-b border-border pb-4">
           <h2 className="text-lg font-semibold text-foreground">Account Security</h2>
           <p className="mt-1 text-sm text-muted-foreground">
-            Update your password and manage active Neuro Spine Care Center sessions.
+            Update your password and manage your account security.
           </p>
         </div>
       ) : (
@@ -984,6 +985,278 @@ export function AccountSecurityPanel({ embedded = false }: { embedded?: boolean 
         />
         <Btn disabled={busy}>Change password</Btn>
       </form>
-      
     </section>
   );
+
+  if (embedded) return card;
+  return (
+    <div className="space-y-6">
+      <PageHeader
+        title="Account & security"
+        sub="Manage your password and sign-in settings."
+      />
+      {card}
+    </div>
+  );
+}
+
+export function AccountSettings() {
+  return <AccountSecurityPanel />;
+}
+
+export function PrintBranding({
+  clinicId,
+  data,
+}: {
+  clinicId?: string;
+  data?: PrintBrandingData | null;
+}) {
+  const remote = useClinicalData<PrintBrandingData>(
+    !data && clinicId ? "/admin/branding?clinicId=" + encodeURIComponent(clinicId) : null,
+  );
+  const info = data ?? remote.data;
+  if (!info?.clinic?.display_name && !info?.doctor?.full_name) return null;
+  return (
+    <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border pb-3 text-xs text-muted-foreground">
+      <div>
+        {info.clinic?.display_name && (
+          <p className="text-sm font-semibold text-foreground">{info.clinic.display_name}</p>
+        )}
+        {info.clinic?.email && <p>{info.clinic.email}</p>}
+      </div>
+      {info.doctor?.full_name && (
+        <div className="text-right">
+          <p className="font-semibold text-foreground">{info.doctor.full_name}</p>
+          {(info.doctor.title || info.doctor.specialty) && (
+            <p>{[info.doctor.title, info.doctor.specialty].filter(Boolean).join(" · ")}</p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function DoctorSignature({
+  data,
+}: {
+  data?: { signature_url?: string } | null;
+}) {
+  if (!data?.signature_url) return null;
+  return (
+    <div className="mt-6 flex justify-end border-t border-border pt-4">
+      <div className="text-right">
+        <img
+          src={data.signature_url}
+          alt="Doctor signature"
+          className="ml-auto max-h-14 object-contain"
+        />
+        <p className="mt-1 text-xs text-muted-foreground">Authorized physician signature</p>
+      </div>
+    </div>
+  );
+}
+
+export function DataManagement() {
+  const remote = useClinicalData<{
+    provider: string;
+    pending: { count: number };
+    statuses: { status: string; count: number }[];
+  }>("/admin/email-status");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
+  if (!remote.data) return <ClinicalLoading error={remote.error} retry={remote.reload} />;
+  const d = remote.data;
+  const unconfigured = d.provider === "not_configured";
+  return (
+    <>
+      <PageHeader
+        title="Data & email delivery"
+        sub="Inspect outbound notification delivery readiness."
+      />
+      <section className="surface space-y-4 p-6">
+        <p className="text-sm">
+          Provider status:{" "}
+          <span className="font-semibold text-foreground">
+            {unconfigured ? "Not configured" : d.provider}
+          </span>
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Pending queued notices: <span className="font-medium text-foreground">{d.pending?.count ?? 0}</span>
+        </p>
+        {unconfigured && (
+          <p className="text-sm text-muted-foreground">
+            No delivery is claimed when unconfigured. Configure EMAIL_PROVIDER, EMAIL_API_KEY, and EMAIL_FROM to send outbound emails.
+          </p>
+        )}
+        {error && (
+          <p role="alert" className="text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        {message && (
+          <p role="status" className="text-sm text-success">
+            {message}
+          </p>
+        )}
+        <Btn
+          disabled={busy || unconfigured}
+          onClick={() => {
+            setBusy(true);
+            setError("");
+            setMessage("");
+            void api("/admin/email-delivery", { method: "POST", body: {} })
+              .then(() => {
+                setMessage("Delivery batch processed.");
+                remote.reload();
+              })
+              .catch((e) => setError(friendlyError(e)))
+              .finally(() => setBusy(false));
+          }}
+        >
+          Deliver pending notices
+        </Btn>
+      </section>
+    </>
+  );
+}
+
+interface SummaryAppointment {
+  id?: string;
+  clinic_id?: string;
+  scheduled_at: string;
+  clinic_name: string;
+  status?: string;
+}
+
+interface SummaryVisit {
+  id?: string;
+  clinic_id?: string;
+  visit_at: string;
+  clinic_name: string;
+}
+
+interface SummaryPrescription {
+  id?: string;
+  visit_id?: string;
+  clinic_id?: string;
+  prescribed_at: string;
+  clinic_name: string;
+}
+
+export function PatientSummary() {
+  const { selected } = useClinicContext();
+  const hasClinicFilter = Boolean(selected && selected !== "all");
+  const remote = useClinicalData<{
+    appointment: SummaryAppointment | null;
+    appointments?: SummaryAppointment[];
+    visit: SummaryVisit | null;
+    visits?: SummaryVisit[];
+    prescription: SummaryPrescription | null;
+    prescriptions?: SummaryPrescription[];
+    followups: FollowUp[];
+  }>("/patient/summary" + (hasClinicFilter ? "?clinicId=" + encodeURIComponent(selected) : ""));
+  if (!remote.data) return <ClinicalLoading error={remote.error} retry={remote.reload} />;
+  const d = remote.data;
+  const scopedAppts = (
+    d.appointments?.length ? d.appointments : d.appointment ? [d.appointment] : []
+  )
+    .filter((a) => !hasClinicFilter || !a.clinic_id || a.clinic_id === selected)
+    .sort((a, b) => a.scheduled_at.localeCompare(b.scheduled_at));
+  const nextAppt = scopedAppts[0] ?? null;
+
+  const scopedVisits = (d.visits?.length ? d.visits : d.visit ? [d.visit] : []).filter(
+    (v) => !hasClinicFilter || !v.clinic_id || v.clinic_id === selected,
+  );
+  const latestVisit = scopedVisits[0] ?? null;
+
+  const scopedRx = (
+    d.prescriptions?.length ? d.prescriptions : d.prescription ? [d.prescription] : []
+  ).filter((p) => !hasClinicFilter || !p.clinic_id || p.clinic_id === selected);
+  const latestRx = scopedRx[0] ?? null;
+
+  const followups = (d.followups ?? []).filter(
+    (f) => !hasClinicFilter || !f.clinic_id || f.clinic_id === selected,
+  );
+  const hasAnyCare = Boolean(nextAppt || latestVisit || latestRx || followups.length);
+
+  return (
+    <section className="surface space-y-4 p-6">
+      <h2 className="text-lg font-bold text-foreground">Care summary</h2>
+
+      {nextAppt ? (
+        <Link
+          to="/patient/appointments"
+          className="block rounded-xl border border-border bg-muted/40 p-4 transition hover:bg-muted/70"
+        >
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <span className="text-sm font-semibold text-foreground">Upcoming appointment</span>
+            <AppointmentStatusBadge status={nextAppt.status || "scheduled"} />
+          </div>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatDateTime(nextAppt.scheduled_at)} · {nextAppt.clinic_name}
+          </p>
+        </Link>
+      ) : (
+        <div className="rounded-xl border border-border bg-muted/40 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-semibold text-foreground">Upcoming appointment</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                No upcoming appointment scheduled.
+              </p>
+            </div>
+            {!hasAnyCare && (
+              <Link
+                to="/patient/appointments"
+                search={{ book: "1" } as never}
+                className="rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary-hover"
+              >
+                Book Appointment
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!hasAnyCare && (
+        <p className="text-sm text-muted-foreground">
+          Your care summary will appear here after your first appointment or clinic visit.
+        </p>
+      )}
+
+      {latestVisit && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-sm font-semibold text-foreground">Latest visit</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatDateOnly(latestVisit.visit_at)} · {latestVisit.clinic_name}
+          </p>
+        </div>
+      )}
+
+      {latestRx && (
+        <div className="rounded-xl border border-border bg-card p-4">
+          <p className="text-sm font-semibold text-foreground">Latest prescription</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatDateOnly(latestRx.prescribed_at)} · {latestRx.clinic_name}
+          </p>
+        </div>
+      )}
+
+      {followups.length > 0 && (
+        <div className="space-y-2">
+          {followups.map((f) => (
+            <div key={f.id} className="rounded-xl border border-border bg-card p-4">
+              <p className="text-sm font-semibold text-foreground">
+                Follow-up · {formatDateOnly(String(f.follow_up_date).slice(0, 10))}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {f.instructions || "Follow-up visit recommended."}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}

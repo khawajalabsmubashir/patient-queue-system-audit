@@ -217,13 +217,9 @@ export function VisitTimeline({
   return (
     <div className="surface overflow-hidden">
       {visits.length ? (
-        visits.map((v) => (
-          <Link
-            key={v.id}
-            to={admin ? "/admin/visits/$visitId" : "/patient/visit/$visitId"}
-            params={{ visitId: v.id }}
-            className="block border-b border-border p-5 last:border-0 hover:bg-muted/40"
-          >
+        visits.map((v) => {
+          const content = (
+            <>
             <div className="flex flex-wrap justify-between gap-2">
               <p className="font-medium">{v.clinicName}</p>
               <span className="text-xs text-muted-foreground">
@@ -244,8 +240,23 @@ export function VisitTimeline({
               </span>
               {v.followUpDate && <span>Follow-up: {formatDateOnly(v.followUpDate)}</span>}
             </div>
-          </Link>
-        ))
+            </>
+          );
+          return admin ? (
+            <Link
+              key={v.id}
+              to="/admin/visits/$visitId"
+              params={{ visitId: v.id }}
+              className="block border-b border-border p-5 last:border-0 hover:bg-muted/40"
+            >
+              {content}
+            </Link>
+          ) : (
+            <div key={v.id} className="block border-b border-border p-5 last:border-0">
+              {content}
+            </div>
+          );
+        })
       ) : (
         <p className="p-8 text-sm text-muted-foreground">
           No clinical visits yet. Previous queue tokens remain in queue history.

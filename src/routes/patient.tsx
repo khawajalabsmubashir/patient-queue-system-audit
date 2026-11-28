@@ -42,14 +42,7 @@ const primaryNavLinks = [
   { to: "/patient/appointments", label: "Appointments", prefetch: "/patient/appointments" },
 ] as const;
 
-const QUEUE_BOUNDARY_PATHS = new Set([
-  "/patient/dashboard",
-  "/patient/live-queue",
-  "/patient/queue",
-  "/patient/history",
-  "/patient/join-queue",
-  "/patient/get-token",
-]);
+const QUEUE_BOUNDARY_PATHS = new Set(["/patient/dashboard"]);
 
 function initialsOf(name?: string) {
   const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
@@ -75,13 +68,18 @@ function PatientFooter() {
   const [helpTopic, setHelpTopic] = useState<HelpTopic | null>(null);
 
   const clinicName = activeClinic?.name || "Neuro Medical Clinic";
-  const clinicAddress = activeClinic?.address || "Ground Floor, Mall Road (Opposite State Life Building, Adjacent to Bank Alfalah), Saddar, Rawalpindi, 46000";
+  const clinicAddress =
+    activeClinic?.address ||
+    "Ground Floor, Mall Road (Opposite State Life Building, Adjacent to Bank Alfalah), Saddar, Rawalpindi, 46000";
   const clinicPhone = activeClinic?.phone || "+92 304 540 5530";
   const clinicEmail = "clinicneurology4@gmail.com";
   const mapsQuery = encodeURIComponent([clinicName, clinicAddress].filter(Boolean).join(", "));
-  const directionsUrl = activeClinic?.id === "northstar" || !activeClinic?.address 
-    ? "https://www.google.com/maps/place/Dr.+Umar+Zafar+%7C+Neuro+Medical+Clinic/@33.5954252,73.0497297,17z/data=!4m7!3m6!1s0x38df958b4b5b0c57:0xd7b883c9ed34ae9b!8m2!3d33.5954252!4d73.0497297!10e1!16s%2Fg%2F11h80p7mjy?entry=ttu"
-    : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
+  const drUmarMapsUrl =
+    "https://www.google.com/maps/place/Dr.+Umar+Zafar+%7C+Neuro+Medical+Clinic/@33.5954252,73.0497297,17z/data=!4m7!3m6!1s0x38df958b4b5b0c57:0xd7b883c9ed34ae9b!8m2!3d33.5954252!4d73.0497297!10e1!16s%2Fg%2F11h80p7mjy?entry=ttu";
+  const directionsUrl =
+    activeClinic?.id === "northstar" || !activeClinic?.address
+      ? drUmarMapsUrl
+      : `https://www.google.com/maps/search/?api=1&query=${mapsQuery}`;
 
   return (
     <>
@@ -96,25 +94,51 @@ function PatientFooter() {
                 </span>
               </div>
               <div className="space-y-1 pt-1 text-xs leading-relaxed text-emerald-100/80">
-                <p className="font-medium text-emerald-200">Dr. Umar Zafar Ali — Consultant Neurophysician &amp; Neurologist (MBBS, FCPS Neurology)</p>
+                <p className="font-medium text-emerald-200">
+                  Dr. Umar Zafar Ali — Consultant Neurophysician &amp; Neurologist (MBBS, FCPS Neurology)
+                </p>
                 <p className="break-words">Consultation Fee: PKR 1,000</p>
                 <p className="break-words">{clinicAddress}</p>
                 <p className="space-x-3">
-                  <span>Mobile: <a href="tel:+923045405530" className="hover:text-white hover:underline">+92 304 540 5530</a></span>
+                  <span>
+                    Mobile:{" "}
+                    <a
+                      href={`tel:${clinicPhone.replace(/[^+\d]/g, "")}`}
+                      className="hover:text-white hover:underline"
+                    >
+                      {clinicPhone}
+                    </a>
+                  </span>
                 </p>
                 <p className="space-x-3">
-                  <span>WhatsApp: <a href="https://wa.me/923333311042" target="_blank" rel="noreferrer" className="hover:text-white hover:underline">+92 333 331 1042</a></span>
+                  <span>
+                    WhatsApp:{" "}
+                    <a
+                      href="https://wa.me/923333311042"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="hover:text-white hover:underline"
+                    >
+                      +92 333 331 1042
+                    </a>
+                  </span>
                 </p>
                 <p>
-                  Landline: <a href="tel:0516128100" className="hover:text-white hover:underline">(051) 6128100</a>
+                  Landline:{" "}
+                  <a href="tel:0516128100" className="hover:text-white hover:underline">
+                    (051) 6128100
+                  </a>
                 </p>
                 <p>
-                  Email: <a href="mailto:clinicneurology4@gmail.com" className="hover:text-white hover:underline">clinicneurology4@gmail.com</a>
+                  Email:{" "}
+                  <a href={`mailto:${clinicEmail}`} className="hover:text-white hover:underline">
+                    {clinicEmail}
+                  </a>
                 </p>
               </div>
-              <p className="pt-1 flex flex-wrap gap-4 text-xs font-medium">
+              <p className="flex flex-wrap gap-4 pt-1 text-xs font-medium">
                 <a
-                  href="https://www.google.com/maps/place/Dr.+Umar+Zafar+%7C+Neuro+Medical+Clinic/@33.5954252,73.0497297,17z/data=!4m7!3m6!1s0x38df958b4b5b0c57:0xd7b883c9ed34ae9b!8m2!3d33.5954252!4d73.0497297!10e1!16s%2Fg%2F11h80p7mjy?entry=ttu"
+                  href={directionsUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="text-emerald-200 underline-offset-4 hover:text-white hover:underline"
@@ -192,9 +216,63 @@ function PatientFooter() {
               </ul>
             </div>
           </div>
+
+          <div className="mt-8 border-t border-emerald-800/60 pt-5 text-xs text-emerald-200/70">
+            &copy; {new Date().getFullYear()} {clinicName}. All rights reserved.
+          </div>
         </div>
       </footer>
 
+      <Dialog open={helpTopic !== null} onOpenChange={(open) => { if (!open) setHelpTopic(null); }}>
+        <DialogContent className="max-w-lg">
+          <DialogTitle>
+            {helpTopic === "faqs"
+              ? "Help & FAQs"
+              : helpTopic === "privacy"
+                ? "Privacy Policy"
+                : helpTopic === "terms"
+                  ? "Terms of Use"
+                  : "Clinic Contact Information"}
+          </DialogTitle>
+          <DialogDescription>
+            {clinicName} — Dr. Umar Zafar Ali
+          </DialogDescription>
+          <div className="space-y-3 text-sm text-muted-foreground">
+            {helpTopic === "faqs" && (
+              <>
+                <p>
+                  Book appointments from the Appointments tab using your preferred clinic center,
+                  date, and available time slot.
+                </p>
+                <p>
+                  Your live queue token and completed visit prescription PDFs are available directly
+                  on your Patient Home page.
+                </p>
+              </>
+            )}
+            {helpTopic === "privacy" && (
+              <p>
+                Your clinical records, appointments, and attached documents are strictly private to
+                your patient account and authorized clinic care staff.
+              </p>
+            )}
+            {helpTopic === "terms" && (
+              <p>
+                Please arrive ahead of your scheduled appointment time. Cancelled appointments release
+                their queue token automatically.
+              </p>
+            )}
+            {helpTopic === "contact" && (
+              <p>
+                Call {clinicPhone} or email {clinicEmail} for clinic assistance.
+              </p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
 
 function PatientLayout() {
   return (

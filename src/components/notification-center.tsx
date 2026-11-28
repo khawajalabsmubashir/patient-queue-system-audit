@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   Bell,
@@ -14,21 +14,13 @@ import { api } from "@/api/client";
 import { Btn } from "@/components/qc";
 import { useAuth } from "@/providers/auth-provider";
 import { friendlyError } from "@/services/errors";
-import {
-  clinicTodayKey,
-  clinicYesterdayKey,
-  formatDateTime,
-  formatFullDateTimeTooltip,
-  toClinicDayKey,
-} from "@/domain/date-format";
+import { formatDateTime, formatFullDateTimeTooltip } from "@/domain/date-format";
 import type { AppNotification } from "@/types/operations";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
 } from "@/components/ui/dropdown-menu";
-
-type DateFilter = "all" | "today" | "yesterday";
 
 function useIsMobileViewport() {
   const [isMobile, setIsMobile] = useState(() =>
@@ -52,10 +44,12 @@ export function notificationHref(n: AppNotification, role: string) {
   switch (n.entity_type) {
     case "visit":
       return patient
-        ? "/patient/visit/" + encodeURIComponent(n.entity_id)
+        ? "/patient/dashboard"
         : "/admin/visits/" + encodeURIComponent(n.entity_id);
     case "prescription":
-      return "/patient/prescription/" + encodeURIComponent(n.entity_id);
+      return patient
+        ? "/patient/dashboard"
+        : "/admin/visits/" + encodeURIComponent(n.entity_id);
     case "invoice":
       return (
         (patient ? "/patient/billing" : "/admin/billing") +
@@ -71,7 +65,7 @@ export function notificationHref(n: AppNotification, role: string) {
           ? "/admin/appointments"
           : "/staff";
     default:
-      return patient ? "/patient/live-queue" : role === "admin" ? "/admin/live-queue" : "/staff";
+      return patient ? "/patient/dashboard" : role === "admin" ? "/admin/live-queue" : "/staff";
   }
 }
 
@@ -82,7 +76,6 @@ function notificationMeta(n: AppNotification) {
       label: "Appointment",
       Icon: CalendarCheck,
       iconCls: "bg-primary-soft text-primary",
-      badgeCls: "bg-primary-soft text-primary",
     };
   }
   if (kind.includes("prescription")) {
@@ -90,7 +83,6 @@ function notificationMeta(n: AppNotification) {
       label: "Prescription",
       Icon: Pill,
       iconCls: "bg-info-soft text-info",
-      badgeCls: "bg-info-soft text-info",
     };
   }
   if (kind.includes("invoice") || kind.includes("payment") || kind.includes("billing")) {
@@ -98,7 +90,6 @@ function notificationMeta(n: AppNotification) {
       label: "Billing",
       Icon: Receipt,
       iconCls: "bg-warning-soft text-warning",
-      badgeCls: "bg-warning-soft text-warning",
     };
   }
   if (kind.includes("document")) {
@@ -106,7 +97,6 @@ function notificationMeta(n: AppNotification) {
       label: "Document",
       Icon: FileText,
       iconCls: "bg-success-soft text-success",
-      badgeCls: "bg-success-soft text-success",
     };
   }
   if (kind.includes("visit") || kind.includes("followup") || kind.includes("follow_up")) {
@@ -114,14 +104,12 @@ function notificationMeta(n: AppNotification) {
       label: "Visit",
       Icon: Stethoscope,
       iconCls: "bg-info-soft text-info",
-      badgeCls: "bg-info-soft text-info",
     };
   }
   return {
     label: "Queue",
     Icon: Ticket,
     iconCls: "bg-primary-soft text-primary",
-    badgeCls: "bg-muted text-muted-foreground",
   };
 }
 
@@ -129,7 +117,6 @@ export function NotificationCenter() {
   const { profile } = useAuth();
   const [items, setItems] = useState<AppNotification[]>([]);
   const [error, setError] = useState("");
-  const [filter, setFilter] = useState<DateFilter>("all");
   const [open, setOpen] = useState(false);
   const isMobile = useIsMobileViewport();
 
@@ -168,32 +155,6 @@ export function NotificationCenter() {
     }
   }
 
-  const todayKey = clinicTodayKey();
-  const yesterdayKey = clinicYesterdayKey();
-
-  const grouped = useMemo(() => {
-    const todayItems: AppNotification[] = [];
-    const yesterdayItems: AppNotification[] = [];
-    const olderItems: AppNotification[] = [];
-    for (const item of items) {
-      const day = toClinicDayKey(item.created_at);
-      if (day === todayKey) todayItems.push(item);
-      else if (day === yesterdayKey) yesterdayItems.push(item);
-      else olderItems.push(item);
-    }
-    const groups: { key: "today" | "yesterday" | "older"; label: string; list: AppNotification[] }[] = [];
-    if ((filter === "all" || filter === "today") && todayItems.length) {
-      groups.push({ key: "today", label: "Today", list: todayItems });
-    }
-    if ((filter === "all" || filter === "yesterday") && yesterdayItems.length) {
-      groups.push({ key: "yesterday", label: "Yesterday", list: yesterdayItems });
-    }
-    if (filter === "all" && olderItems.length) {
-      groups.push({ key: "older", label: "Older", list: olderItems });
-    }
-    return groups;
-  }, [items, filter, todayKey, yesterdayKey]);
-
   useEffect(() => {
     if (!isMobile || !open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -205,190 +166,124 @@ export function NotificationCenter() {
 
   const unreadCount = items.filter((n) => !n.read_at).length;
 
-    const panelBody = (
+  const panelBody = (
     <>
-      <div className="flex items-center justify-between border-b border-border px-4 py-3">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-border px-4 py-3">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-bold text-foreground">Notifications</h2>
           {unreadCount > 0 && (
-            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+            <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
               {unreadCount} new
             </span>
           )}
         </div>
         <div className="flex items-center gap-1">
-          <Btn
-            variant="ghost"
-            className="h-8 shrink-0 whitespace-nowrap px-2.5 text-xs"
-            onClick={() => void read()}
-          >
-            Mark all read
-          </Btn>
+          {items.length > 0 && (
+            <Btn
+              variant="ghost"
+              className="h-8 shrink-0 whitespace-nowrap px-2.5 text-xs"
+              onClick={() => void read()}
+            >
+              Mark all read
+            </Btn>
+          )}
           <button
             type="button"
             aria-label="Close notifications"
             onClick={() => setOpen(false)}
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted-foreground transition hover:bg-muted hover:text-foreground"
+            className="grid size-8 shrink-0 place-items-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
           >
             <X className="size-4" aria-hidden="true" />
           </button>
         </div>
       </div>
-      <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-3">
+
+      <div className="thin-scrollbar min-h-0 flex-1 overflow-y-auto overscroll-contain p-2">
         {error && (
-          <p role="alert" className="mb-2 text-sm text-destructive">
+          <p role="alert" className="mx-2 my-1 text-sm text-destructive">
             {error}
           </p>
         )}
-        <div className="space-y-2">
+
+        <div className="space-y-1">
           {items.map((n) => {
             const meta = notificationMeta(n);
             const Icon = meta.Icon;
             const unread = !n.read_at;
+            const href = notificationHref(n, profile?.role ?? "patient");
             return (
               <article
                 key={n.id}
                 className={
-                  "rounded-xl border px-3.5 py-3 transition " +
-                  (unread
-                    ? "border-primary/30 bg-primary/5"
-                    : "border-border/60 bg-card hover:bg-muted/40")
+                  "group flex items-start gap-3 rounded-xl px-3 py-2.5 transition " +
+                  (unread ? "bg-primary/5 hover:bg-primary/10" : "hover:bg-muted/60")
                 }
               >
-                <div className="flex items-start gap-3">
-                  <div
-                    className={"mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg " + meta.iconCls}
+                <div
+                  className={
+                    "mt-0.5 grid size-9 shrink-0 place-items-center rounded-full " + meta.iconCls
+                  }
+                >
+                  <Icon className="size-4" aria-hidden="true" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <a
+                    href={href}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      setOpen(false);
+                      void read(n.id).then(() => window.location.assign(href));
+                    }}
+                    className="block"
                   >
-                    <Icon className="size-4" aria-hidden="true" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <a
-                      href={notificationHref(n, profile?.role ?? "patient")}
-                      onClick={(e) => {
-                        e.preventDefault();
-                        setOpen(false);
-                        void read(n.id).then(() =>
-                          window.location.assign(
-                            notificationHref(n, profile?.role ?? "patient"),
-                          ),
-                        );
-                      }}
-                      className="block"
+                    <p
+                      className={
+                        "text-sm leading-snug text-foreground " +
+                        (unread ? "font-semibold" : "font-medium")
+                      }
                     >
-                      <div className="flex flex-wrap items-center justify-between gap-1.5">
-                        <span
-                          className={"inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold " + meta.badgeCls}
-                        >
-                          {meta.label}
-                        </span>
-                        <time
-                          dateTime={n.created_at}
-                          title={formatFullDateTimeTooltip(n.created_at)}
-                          className="tabular-nums text-[11px] text-muted-foreground"
-                        >
-                          {formatDateTime(n.created_at)}
-                        </time>
-                      </div>
-                      <p className="mt-1 text-sm font-medium text-foreground">{n.title}</p>
-                      <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
-                        {n.message}
-                      </p>
-                    </a>
-                    {unread && (
+                      {n.title}
+                    </p>
+                    <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
+                      {n.message}
+                    </p>
+                    <time
+                      dateTime={n.created_at}
+                      title={formatFullDateTimeTooltip(n.created_at)}
+                      className={
+                        "tabular-nums mt-1 block text-[11px] " +
+                        (unread ? "font-semibold text-primary" : "text-muted-foreground")
+                      }
+                    >
+                      {formatDateTime(n.created_at)}
+                    </time>
+                  </a>
+                </div>
+                <div className="flex shrink-0 flex-col items-end gap-1.5 pt-1">
+                  {unread ? (
+                    <>
+                      <span
+                        className="size-2.5 rounded-full bg-primary"
+                        aria-label="Unread notification"
+                      />
                       <button
                         type="button"
-                        className="mt-1.5 text-xs font-medium text-primary hover:underline"
+                        className="text-[11px] font-medium text-primary hover:underline"
                         onClick={() => void read(n.id)}
                       >
                         Mark read
                       </button>
-                    )}
-                  </div>
+                    </>
+                  ) : null}
                 </div>
               </article>
             );
           })}
         </div>
+
         {!items.length && !error && (
           <p className="py-8 text-center text-sm text-muted-foreground">
             You’re all caught up.
-          </p>
-        )}
-      </div>
-    </>
-  );
-
-  return (
-                    <article
-                      key={n.id}
-                      className={
-                        "rounded-lg border px-3.5 py-2.5 transition " +
-                        (unread
-                          ? "border-primary/30 bg-primary/5"
-                          : "border-border/60 bg-card hover:bg-muted/40")
-                      }
-                    >
-                      <div className="flex items-start gap-3">
-                        <div
-                          className={`mt-0.5 grid size-8 shrink-0 place-items-center rounded-lg ${meta.iconCls}`}
-                        >
-                          <Icon className="size-4" aria-hidden="true" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <a
-                            href={notificationHref(n, profile?.role ?? "patient")}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setOpen(false);
-                              void read(n.id).then(() =>
-                                window.location.assign(
-                                  notificationHref(n, profile?.role ?? "patient"),
-                                ),
-                              );
-                            }}
-                            className="block"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-1.5">
-                              <span
-                                className={`inline-flex items-center rounded px-1.5 py-0.5 text-[10px] font-semibold ${meta.badgeCls}`}
-                              >
-                                {meta.label}
-                              </span>
-                              <time
-                                dateTime={n.created_at}
-                                title={formatFullDateTimeTooltip(n.created_at)}
-                                className="tabular-nums text-[11px] text-muted-foreground"
-                              >
-                                {formatDateTime(n.created_at)}
-                              </time>
-                            </div>
-                            <p className="mt-1 text-sm font-medium text-foreground">{n.title}</p>
-                            <p className="mt-0.5 break-words text-xs leading-relaxed text-muted-foreground">
-                              {n.message}
-                            </p>
-                          </a>
-                          {unread && (
-                            <button
-                              type="button"
-                              className="mt-1.5 text-xs font-medium text-primary hover:underline"
-                              onClick={() => void read(n.id)}
-                            >
-                              Mark read
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </article>
-                  );
-                })}
-              </div>
-            </section>
-          ))}
-        </div>
-
-        {!grouped.length && !error && (
-          <p className="py-6 text-center text-sm text-muted-foreground">
-            {items.length ? `No notifications for ${filter}.` : "You’re all caught up."}
           </p>
         )}
       </div>
@@ -461,7 +356,7 @@ export function NotificationCenter() {
         align="end"
         sideOffset={8}
         collisionPadding={12}
-        className="flex max-h-[min(70dvh,32rem)] w-[25rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl p-0 shadow-lg"
+        className="flex max-h-[min(70dvh,32rem)] w-[23rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-xl p-0 shadow-lg"
       >
         {panelBody}
       </DropdownMenuContent>

@@ -158,7 +158,7 @@ it("notification links resolve to relevant patient and staff pages", () => {
   expect(notificationHref({ ...n, entity_type: "document" }, "patient")).toBe("/patient/documents");
 });
 
-it("BUG-24: notification bell groups by Today/Yesterday/Older, filters tabs, shows 12h time without seconds & type badges", async () => {
+it("Facebook-style unified notification list renders compact rows without Today/Yesterday tabs or groups", async () => {
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   const older = new Date(now.getTime() - 5 * 24 * 60 * 60 * 1000);
@@ -202,32 +202,19 @@ it("BUG-24: notification bell groups by Today/Yesterday/Older, filters tabs, sho
   const bell = await screen.findByRole("button", { name: "Notifications" });
   fireEvent.keyDown(bell, { key: "Enter" });
 
-  expect(await screen.findByRole("tab", { name: "All" })).toBeVisible();
-  expect(screen.getByRole("tab", { name: "Today" })).toBeVisible();
-  expect(screen.getByRole("tab", { name: "Yesterday" })).toBeVisible();
-  expect(screen.getByText("Appointment")).toBeVisible();
-  expect(screen.getByText("Billing")).toBeVisible();
-  expect(screen.getByText("Prescription")).toBeVisible();
-  expect(screen.getByText("Booked today")).toBeVisible();
+  expect(await screen.findByText("Booked today")).toBeVisible();
   expect(screen.getByText("Bill yesterday")).toBeVisible();
   expect(screen.getByText("Rx older")).toBeVisible();
+  expect(screen.queryByRole("tab", { name: "Today" })).toBeNull();
+  expect(screen.queryByRole("tab", { name: "Yesterday" })).toBeNull();
 
-  // Verify unread card uses inner padding (does not sit flush on outer edge) and 12h time without seconds
   const unreadCard = screen.getByText("Booked today").closest("article")!;
-  expect(unreadCard.className).toContain("px-3.5");
+  expect(unreadCard.className).toContain("bg-primary/5");
+  expect(unreadCard.querySelector("[aria-label=\"Unread notification\"]")).not.toBeNull();
   const timeEl = unreadCard.querySelector("time")!;
   expect(timeEl.textContent).toMatch(/(AM|PM)$/);
   expect(timeEl.textContent).not.toMatch(/:\d{2}:\d{2}/);
   expect(timeEl).toHaveAttribute("title");
-
-  fireEvent.click(screen.getByRole("tab", { name: "Today" }));
-  expect(screen.getByText("Booked today")).toBeVisible();
-  expect(screen.queryByText("Bill yesterday")).toBeNull();
-  expect(screen.queryByText("Rx older")).toBeNull();
-
-  fireEvent.click(screen.getByRole("tab", { name: "Yesterday" }));
-  expect(screen.getByText("Bill yesterday")).toBeVisible();
-  expect(screen.queryByText("Booked today")).toBeNull();
 });
 
 it("BUG-031: mobile viewport renders compact notification bottom sheet with explicit close button and pinned header", async () => {

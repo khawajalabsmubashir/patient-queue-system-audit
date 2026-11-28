@@ -1,5 +1,5 @@
 import { useEffect, useId, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { ChevronRight, Download, FileText, Plus } from "lucide-react";
 import {
   AttachmentFields,
@@ -528,13 +528,9 @@ export function Appointments() {
                   <span>Download Your Prescription (PDF)</span>
                 </a>
               ) : !detailLoading ? (
-                <Link
-                  to="/patient/visits"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary-hover sm:text-sm"
-                >
-                  <FileText className="size-4" aria-hidden="true" />
-                  <span>View Visit Prescriptions</span>
-                </Link>
+                <p className="text-xs text-muted-foreground">
+                  Your prescription PDF will be available here once finalized by the clinic.
+                </p>
               ) : null}
             </div>
           )}

@@ -39,7 +39,6 @@ import { Route as LoginRoute } from "@/routes/login";
 import { Route as PatientRoute } from "@/routes/patient";
 import { Route as DashboardRoute } from "@/routes/patient.dashboard";
 import { Join } from "@/routes/patient.join-queue";
-import { QueuePage } from "@/routes/patient.queue";
 import { Route as HistoryRoute } from "@/routes/patient.history";
 
 beforeEach(() => {
@@ -65,18 +64,13 @@ function renderPatientApp() {
     component: DashboardRoute.options.component!,
   });
   const join = createRoute({ getParentRoute: () => patient, path: "get-token", component: Join });
-  const queue = createRoute({
-    getParentRoute: () => patient,
-    path: "live-queue",
-    component: QueuePage,
-  });
-  const history = createRoute({
+    const history = createRoute({
     getParentRoute: () => patient,
     path: "history",
     component: HistoryRoute.options.component!,
   });
   const router = createRouter({
-    routeTree: root.addChildren([login, patient.addChildren([dashboard, join, queue, history])]),
+    routeTree: root.addChildren([login, patient.addChildren([dashboard, join, history])]),
     history: createMemoryHistory({ initialEntries: ["/login"] }),
     context: { queryClient: new QueryClient() },
   });
@@ -93,18 +87,14 @@ it("preserves login, anonymous appointment-token tracking, completion and histor
   fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
   await screen.findByRole("heading", { name: "Welcome, Zain" });
   expect(screen.getAllByText("~20 min").length).toBeGreaterThanOrEqual(1);
-  await act(async () => {
-    await router.navigate({ to: "/patient/live-queue" });
-  });
-  await screen.findByRole("heading", { name: "Live queue" });
   expect(screen.queryByText("Sara Ali")).not.toBeInTheDocument();
   expect(screen.queryByText("Ahmed Khan")).not.toBeInTheDocument();
   act(() => actions.demo("almost"));
-  expect(screen.getByRole("status")).toHaveTextContent("2 patients are ahead");
+  expect(await screen.findByText(/2 patients ahead in queue/i)).toBeVisible();
   act(() => actions.call("A-024"));
-  expect(screen.getByRole("status")).toHaveTextContent("Your token is being called");
+  expect(await screen.findByText(/Your turn now/i)).toBeVisible();
   act(() => actions.markDone());
-  expect(screen.getByRole("status")).toHaveTextContent("Visit completed");
+  expect(await screen.findByText("Visit completed.")).toBeVisible();
   await act(async () => {
     await router.navigate({ to: "/patient/history" });
   });
