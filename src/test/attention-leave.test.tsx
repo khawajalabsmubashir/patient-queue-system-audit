@@ -100,7 +100,7 @@ it("previews leave conflicts and links affected appointments without activating 
   expect(f.api.mock.calls.some((c) => c[1]?.method === "POST")).toBe(false);
 });
 it("confirms range leave and safely removes it with existing confirmation controls", async () => {
-  let leaves: Array<{ id: string; startDate: string; endDate: string; reason: string }> = [];
+  let leaves: any[] = [];
   f.api.mockImplementation(async (path: string, o?: { method?: string }) => {
     if (o?.method === "POST") {
       leaves = [{ id: "leave1", startDate: "2031-10-01", endDate: "2031-10-02", reason: "Away" }];

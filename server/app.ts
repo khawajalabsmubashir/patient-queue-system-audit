@@ -72,66 +72,6 @@ export function createLocalApp(options: {
   app.use("/api/admin/visits", express.json({ limit: "64kb" }));
   app.use(express.json({ limit: "16kb" }));
   app.get("/api/health", (_req, res) => res.json({ status: "ok" }));
-  app.get("/api/download-zip", async (_req, res) => {
-    try {
-      const zip = new (await import("jszip")).default();
-      const filesToInclude = [
-        "src/routes/patient.tsx",
-        "src/routes/patient.dashboard.tsx",
-        "src/routes/patient.appointments.tsx",
-        "src/routes/admin.clinics.tsx",
-        "src/routes/account.tsx",
-        "src/routes/__root.tsx",
-        "src/components/app-link.tsx",
-        "src/components/appointment-rows.tsx",
-        "src/components/appointment-tokens.tsx",
-        "src/components/billing-workspace.tsx",
-        "src/components/clinic-location-picker.tsx",
-        "src/components/clinical.tsx",
-        "src/components/final-operations.tsx",
-        "src/components/form-controls.tsx",
-        "src/components/notification-center.tsx",
-        "src/components/qc.tsx",
-        "src/providers/clinic-provider.tsx",
-        "src/styles.css",
-        "server/index.ts",
-        "server/routes/operations.ts",
-        "server/routes/token-documents.ts",
-        "server/services/document-storage.ts",
-        "server/services/final.ts",
-        "vite.config.ts",
-        "metadata.json",
-      ];
-
-      for (const file of filesToInclude) {
-        const filePath = path.resolve(process.cwd(), file);
-        if (existsSync(filePath)) {
-          zip.file(file, readFileSync(filePath, "utf8"));
-        }
-      }
-
-      const deletionsText = `FILES TO DELETE FROM YOUR REPOSITORY:
-- src/routes/patient.live-queue.tsx
-- src/routes/patient.prescriptions.tsx
-- src/routes/patient.prescription.$visitId.tsx
-- src/routes/patient.visit.$visitId.tsx
-- src/routes/patient.visits.tsx
-- src/routes/patient.queue.tsx
-- src/routes/patient.history.tsx
-- src/routes/patient.documents.tsx
-- src/routes/patient.get-token.tsx
-- src/routes/patient.join-queue.tsx
-`;
-      zip.file("DELETIONS.txt", deletionsText);
-
-      const content = await zip.generateAsync({ type: "nodebuffer" });
-      res.setHeader("Content-Type", "application/zip");
-      res.setHeader("Content-Disposition", 'attachment; filename="queuecare-updated-files.zip"');
-      res.send(content);
-    } catch (err) {
-      res.status(500).json({ error: String(err) });
-    }
-  });
   const notify = (event: string) => {
     io.emit(event);
     io.emit("queue:updated");

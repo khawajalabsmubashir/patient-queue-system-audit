@@ -57,15 +57,8 @@ test(
     ) {
       if (path === "__book-appointment") {
         const me = (await request("/auth/me", cookie)).data;
-        const p = (await one<Record<string, unknown>>(
-          instance!.db,
-          "SELECT * FROM users WHERE id=?",
-          me.id,
-        ))!;
-        const data = await bookedToken(
-          instance!.db,
-          p as unknown as Parameters<typeof bookedToken>[1],
-        );
+        const p = (await one<any>(instance!.db, "SELECT * FROM users WHERE id=?", me.id))!;
+        const data = await bookedToken(instance!.db, p);
         instance!.io.emit("queue:updated");
         return { status: 200, data, error: undefined, cookie: "" };
       }
@@ -199,12 +192,10 @@ test(
         (await request("/patient/token/cancel", second.cookie, { tokenId: token2.id })).status,
         200,
       );
-      const cancelledToken = await one<{ status: string }>(
-        instance!.db,
-        "SELECT status FROM tokens WHERE id=?",
-        token2.id,
+      assert.equal(
+        (await one<any>(instance!.db, "SELECT status FROM tokens WHERE id=?", token2.id)).status,
+        "cancelled",
       );
-      assert.equal(cancelledToken?.status, "cancelled");
       assert.equal((await action("close")).status, 200);
       assert.equal((await request("/patient/token", first.cookie, {})).status, 409);
       assert.equal((await action("open")).status, 200);
@@ -273,9 +264,9 @@ test(
     } finally {
       socket?.disconnect();
       if (instance) await instance.close();
-      if (/^queuecare_test_[a-f0-9]{16}$/.test(schema)) {
-        await adminQuery(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
-      }
+      // The generated identifier is validated and is exclusively this test's schema.
+      if (!/^queuecare_test_[a-f0-9]{16}$/.test(schema)) throw new Error("Invalid cleanup schema.");
+      await adminQuery(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
     }
   },
 );

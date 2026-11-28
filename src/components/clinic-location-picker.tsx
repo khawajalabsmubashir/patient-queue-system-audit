@@ -17,7 +17,9 @@ export function ClinicLocationPicker({
   const active = clinics.filter((c) => c.active !== false);
   const selected = active.find((c) => c.id === value);
 
-  const [city, setCity] = useState(selected?.city || (selected ? legacy : ""));
+  const [city, setCity] = useState(
+    selected?.city || (selected ? legacy : ""),
+  );
 
   useEffect(() => {
     const clinic = active.find((c) => c.id === value);
@@ -29,15 +31,16 @@ export function ClinicLocationPicker({
 
   const cities = [
     ...new Map(
-      [...DEFAULT_CITIES, ...active.map((c) => c.city || legacy)].map((name) => [
-        normalizeLocation(name),
-        name,
-      ]),
+      [
+        ...DEFAULT_CITIES,
+        ...active.map((c) => c.city || legacy),
+      ].map((name) => [normalizeLocation(name), name]),
     ).values(),
   ].sort((a, b) => a.localeCompare(b));
 
   const relevant = active.filter(
-    (c) => normalizeLocation(c.city || legacy) === normalizeLocation(city),
+    (c) =>
+      normalizeLocation(c.city || legacy) === normalizeLocation(city),
   );
 
   return (

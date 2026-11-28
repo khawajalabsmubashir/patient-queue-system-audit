@@ -5,7 +5,6 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { api } from "@/api/client";
 import { useClinicContext } from "@/providers/clinic-provider";
-import { AppLink } from "@/components/app-link";
 import { PageHeader, Btn } from "@/components/qc";
 import {
   useClinicalData,
@@ -67,13 +66,13 @@ function PatientRecord() {
         sub="Global patient record · history across all clinics"
         right={
           current ? (
-            <AppLink href={"/admin/visits/" + current.id}>
+            <a href={"/admin/visits/" + current.id}>
               <Btn>Continue consultation</Btn>
-            </AppLink>
+            </a>
           ) : token && token.status !== "serving" ? (
-            <AppLink href={"/admin/live-queue?clinicId=" + selected}>
+            <a href={"/admin/live-queue?clinicId=" + selected}>
               <Btn>Open queue to call patient</Btn>
-            </AppLink>
+            </a>
           ) : (
             <StartConsultation
               patientId={p.id}
@@ -123,7 +122,7 @@ function PatientRecord() {
                 rows={3}
                 maxLength={2000}
                 defaultValue={p[key] ?? ""}
-                className="mt-2 w-full rounded-lg border border-input bg-card p-3 text-base font-normal sm:text-sm"
+                className="mt-2 w-full rounded-lg border border-input bg-card p-3 text-sm font-normal"
               />
             </label>
           ))}

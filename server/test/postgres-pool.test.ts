@@ -128,9 +128,7 @@ test("Vercel retries only rejected session-pool acquisitions and never replays S
     assert.equal(statements.filter((s) => s === "WRITE TRANSACTION").length, 1);
     queryFailure = true;
     const prior = connections;
-    await assert.rejects(async () => {
-      await db!.exec("WRITE ONCE");
-    }, /EMAXCONNSESSION/);
+    await assert.rejects(async () => { await db!.exec("WRITE ONCE"); }, /EMAXCONNSESSION/);
     assert.equal(connections, prior + 1);
     assert.equal(statements.filter((s) => s === "WRITE ONCE").length, 1);
     assert.equal(releases, 3);

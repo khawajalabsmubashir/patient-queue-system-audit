@@ -3,7 +3,7 @@ import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import react from "@vitejs/plugin-react";
 import tsconfigPaths from "vite-tsconfig-paths";
 import { defineConfig, loadEnv } from "vite";
-const backendPort = process.env["BACKEND_PORT"] || "3001";
+const port = process.env["PORT"] || loadEnv("development", process.cwd(), "")["PORT"] || "3001";
 export default defineConfig({
   css: { transformer: "lightningcss" },
   resolve: {
@@ -28,10 +28,9 @@ export default defineConfig({
     ignoreOutdatedRequests: true,
   },
   server: {
-    port: 3000,
-    host: "0.0.0.0",
-    strictPort: false,
-    hmr: process.env.DISABLE_HMR !== "true",
+    port: 5174,
+    host: "127.0.0.1",
+    strictPort: true,
     fs: {
       deny: [
         ".env",
@@ -48,13 +47,10 @@ export default defineConfig({
         "**/*.sqlite*",
       ],
     },
-    watch:
-      process.env.DISABLE_HMR === "true"
-        ? null
-        : { ignored: ["**/data/**", "**/.npm-cache/**", "**/work/**"] },
+    watch: { ignored: ["**/data/**", "**/.npm-cache/**", "**/work/**"] },
     proxy: {
-      "/api": `http://127.0.0.1:${backendPort}`,
-      "/socket.io": { target: `http://127.0.0.1:${backendPort}`, ws: true },
+      "/api": `http://127.0.0.1:${port}`,
+      "/socket.io": { target: `http://127.0.0.1:${port}`, ws: true },
     },
   },
   plugins: [
